@@ -230,7 +230,10 @@ class EnvRobosuite(EB.EnvBase):
                     ret[k] = ObsUtils.process_obs(obs=ret[k], obs_key=k)
 
         # "object" key contains object information
-        ret["object"] = np.array(di["object-state"])
+        if "object-state" in di:
+            ret["object"] = np.array(di["object-state"])
+        else:
+            ret["object"] = np.array(di["object"])
 
         if self._is_v1:
             for robot in self.env.robots:
@@ -243,7 +246,8 @@ class EnvRobosuite(EB.EnvBase):
                         ret[k] = np.array(di[k])
         else:
             # minimal proprioception for older versions of robosuite
-            ret["proprio"] = np.array(di["robot-state"])
+            if "robot-state" in di:
+                ret["proprio"] = np.array(di["robot-state"])
             ret["eef_pos"] = np.array(di["eef_pos"])
             ret["eef_quat"] = np.array(di["eef_quat"])
             ret["gripper_qpos"] = np.array(di["gripper_qpos"])

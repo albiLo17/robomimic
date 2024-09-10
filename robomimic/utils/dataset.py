@@ -9,6 +9,7 @@ from copy import deepcopy
 from contextlib import contextmanager
 
 import torch.utils.data
+from torch.distributions.geometric import Geometric
 
 import robomimic.utils.tensor_utils as TensorUtils
 import robomimic.utils.obs_utils as ObsUtils
@@ -32,6 +33,7 @@ class SequenceDataset(torch.utils.data.Dataset):
         hdf5_normalize_obs=False,
         filter_by_attribute=None,
         load_next_obs=True,
+        contrastive_rl=False,
     ):
         """
         Dataset class for fetching sequences of experience.
@@ -86,8 +88,13 @@ class SequenceDataset(torch.utils.data.Dataset):
         self.hdf5_use_swmr = hdf5_use_swmr
         self.hdf5_normalize_obs = hdf5_normalize_obs
         self._hdf5_file = None
+        
+        # this is needed to sample next obs from a geometric distribution
+        self.contrastive_rl = contrastive_rl
+        gamma =  0.99
+        self.GEOM = Geometric(1 - gamma)
 
-        assert hdf5_cache_mode in ["all", "low_dim", None]
+        assert hdf5_cache_mode in ["all", "low_dim", None, "hdf5"]
         self.hdf5_cache_mode = hdf5_cache_mode
 
         self.load_next_obs = load_next_obs
@@ -105,9 +112,11 @@ class SequenceDataset(torch.utils.data.Dataset):
 
         self.goal_mode = goal_mode
         if self.goal_mode is not None:
-            assert self.goal_mode in ["last"]
+            assert self.goal_mode in ["last", "custom"]
         if not self.load_next_obs:
-            assert self.goal_mode != "last"  # we use last next_obs as goal
+            # allow only last and custom
+            assert self.goal_mode in ["last", "custom"]
+            # assert self.goal_mode != "last"  # we use last next_obs as goal
 
         self.pad_seq_length = pad_seq_length
         self.pad_frame_stack = pad_frame_stack
@@ -139,7 +148,7 @@ class SequenceDataset(torch.utils.data.Dataset):
                 load_next_obs=self.load_next_obs
             )
 
-            if self.hdf5_cache_mode == "all":
+            if self.hdf5_cache_mode == "all" and not self.contrastive_rl:
                 # cache getitem calls for even more speedup. We don't do this for
                 # "low-dim" since image observations require calls to getitem anyways.
                 print("SequenceDataset: caching get_item calls...")
@@ -149,7 +158,19 @@ class SequenceDataset(torch.utils.data.Dataset):
                 del self.hdf5_cache
                 self.hdf5_cache = None
         else:
-            self.hdf5_cache = None
+            if self.hdf5_cache_mode != "hdf5":            
+                self.hdf5_cache = None
+            else:          
+                obs_keys_in_memory = self.obs_keys
+                self.obs_keys_in_memory = obs_keys_in_memory
+    
+                self.hdf5_cache = self.load_dataset_in_memory(
+                    demo_list=self.demos,
+                    hdf5_file=self.hdf5_file,
+                    obs_keys=self.obs_keys_in_memory,
+                    dataset_keys=self.dataset_keys,
+                    load_next_obs=self.load_next_obs
+                )
 
         self.close_and_delete_hdf5_handle()
 
@@ -296,6 +317,16 @@ class SequenceDataset(torch.utils.data.Dataset):
 
             if "model_file" in hdf5_file["data/{}".format(ep)].attrs:
                 all_data[ep]["attrs"]["model_file"] = hdf5_file["data/{}".format(ep)].attrs["model_file"]
+        
+        # chec if the hdf5_file contain goal_obs
+        if "goal_obs" in hdf5_file:
+            # check if the first key is a demo
+            if "demo" in list(hdf5_file["goal_obs"].keys())[0]:
+                self.goal_obs = {}
+                for ep in demo_list:
+                    self.goal_obs[ep] = {k: hdf5_file["goal_obs/{}/{}".format(ep, k)][()] for k in obs_keys}
+            else:
+                self.goal_obs = {k: hdf5_file["goal_obs/{}".format(k)][()] for k in obs_keys}
 
         return all_data
 
@@ -389,18 +420,60 @@ class SequenceDataset(torch.utils.data.Dataset):
                 assert(key1 in ['obs', 'next_obs'])
                 ret = self.hdf5_cache[ep][key1][key2]
             else:
+                if self.hdf5_cache is None:
+                    print("key: ", key)
                 ret = self.hdf5_cache[ep][key]
         else:
             # read from file
-            hd5key = "data/{}/{}".format(ep, key)
-            ret = self.hdf5_file[hd5key]
+            if self.hdf5_cache_mode == "hdf5":
+                if '/' in key:
+                    key1, key2 = key.split('/')
+                    ret = self.hdf5_cache[ep][key1][key2]
+                else:
+                    ret = self.hdf5_cache[ep][key]
+            else:
+                hd5key = "data/{}/{}".format(ep, key)
+                ret = self.hdf5_file[hd5key]
         return ret
 
+    def get_dataset_for_goal(self, ep, key):
+        """
+        Helper utility to get a dataset for the goal.
+        Takes into account whether the dataset has been loaded into memory.
+        """
+
+        # check if this key should be in memory
+        key_should_be_in_memory = (self.hdf5_cache_mode in ["all", "low_dim"])
+        if key_should_be_in_memory:
+            # if key is an observation, it may not be in memory
+            if '/' in key:
+                key1, key2 = key.split('/')
+                assert(key1 in ['obs', 'next_obs'])
+                if key2 not in self.obs_keys_in_memory:
+                    key_should_be_in_memory = False
+
+        if key_should_be_in_memory:
+            # read cache
+            if '/' in key:
+                key1, key2 = key.split('/')
+                assert(key1 in ['obs', 'next_obs'])
+                ret = self.goal_obs[ep][key1][key2].reshape(1, -1)
+            else:
+                ret = self.goal_obs[ep][key].reshape(1, -1)
+        else:
+            # read from file
+            if self.hdf5_cache_mode == "hdf5":
+                ret = self.goal_obs[ep][key].reshape(1, -1)
+            else:
+                hd5key = "[ep]/{}/{}".format(ep, "goal_obs", key)
+                ret = np.asarray(self.hdf5_file[hd5key]).reshape(1, -1)
+        return ret
+    
     def __getitem__(self, index):
         """
         Fetch dataset sequence @index (inferred through internal index map), using the getitem_cache if available.
         """
-        if self.hdf5_cache_mode == "all":
+        if self.hdf5_cache_mode == "all" and not self.contrastive_rl:
             return self.getitem_cache[index]
         return self.get_item(index)
 
@@ -431,7 +504,7 @@ class SequenceDataset(torch.utils.data.Dataset):
 
         # determine goal index
         goal_index = None
-        if self.goal_mode == "last":
+        if self.goal_mode in ["last", "custom"]:
             goal_index = end_index_in_demo - 1
 
         meta["obs"] = self.get_obs_sequence_from_demo(
@@ -444,25 +517,49 @@ class SequenceDataset(torch.utils.data.Dataset):
         )
 
         if self.load_next_obs:
-            meta["next_obs"] = self.get_obs_sequence_from_demo(
-                demo_id,
-                index_in_demo=index_in_demo,
-                keys=self.obs_keys,
-                num_frames_to_stack=self.n_frame_stack - 1,
-                seq_length=self.seq_length,
-                prefix="next_obs"
-            )
+            if not self.contrastive_rl:
+                # todo: if the method is contrastive rl, we should not load precisely the next obs but one of the next
+                meta["next_obs"] = self.get_obs_sequence_from_demo(
+                    demo_id,
+                    index_in_demo=index_in_demo,
+                    keys=self.obs_keys,
+                    num_frames_to_stack=self.n_frame_stack - 1,
+                    seq_length=self.seq_length,
+                    prefix="next_obs"
+                )
+            else:
+                len_remaining_trj = demo_length - index_in_demo
+                next_state = int(torch.clamp(self.GEOM.sample(), max=len_remaining_trj - 1).item())
+                meta["next_obs"] = self.get_obs_sequence_from_demo(
+                    demo_id,
+                    index_in_demo=next_state,
+                    keys=self.obs_keys,
+                    num_frames_to_stack=self.n_frame_stack - 1,
+                    seq_length=self.seq_length,
+                    prefix="next_obs"
+                )
 
         if goal_index is not None:
-            goal = self.get_obs_sequence_from_demo(
-                demo_id,
-                index_in_demo=goal_index,
-                keys=self.obs_keys,
-                num_frames_to_stack=0,
-                seq_length=1,
-                prefix="next_obs",
-            )
-            meta["goal_obs"] = {k: goal[k][0] for k in goal}  # remove sequence dimension for goal
+            # TODO: pronbably the best way to address this is to have a "goal" key in the dataset
+            if self.goal_mode == "last":
+                goal = self.get_obs_sequence_from_demo(
+                    demo_id,
+                    index_in_demo=goal_index,
+                    keys=self.obs_keys,
+                    num_frames_to_stack=0,
+                    seq_length=1,
+                    prefix="next_obs",
+                )
+                meta["goal_obs"] = {k: goal[k][0] for k in goal}  # remove sequence dimension for goal
+            else:
+                goal = self.get_obs_sequence_goal_from_demo(
+                    demo_id,
+                    keys=self.obs_keys,
+                    num_frames_to_stack=0,
+                    seq_length=1,
+                    prefix="next_obs",
+                )
+                meta["goal_obs"] = {k: goal[k][0] for k in goal}  # remove sequence dimension for goal
 
         return meta
 
@@ -511,6 +608,52 @@ class SequenceDataset(torch.utils.data.Dataset):
         pad_mask = pad_mask[:, None].astype(bool)
 
         return seq, pad_mask
+    
+    def get_sequence_goal_from_demo(self, ep, keys, num_frames_to_stack=0, seq_length=1):
+        """
+        Extract a (sub)sequence of the goal items from a demo given the @keys of the items.
+
+        Args:
+            demo_id (str): id of the demo, e.g., demo_0
+            index_in_demo (int): beginning index of the sequence wrt the demo
+            keys (tuple): list of keys to extract
+            num_frames_to_stack (int): numbers of frame to stack. Seq gets prepended with repeated items if out of range
+            seq_length (int): sequence length to extract. Seq gets post-pended with repeated items if out of range
+
+        Returns:
+            a dictionary of extracted items.
+        """
+        assert num_frames_to_stack >= 0
+        assert seq_length >= 1
+
+        index_in_demo = 0
+        demo_length = 1
+
+        # determine begin and end of sequence
+        seq_begin_index = max(0, index_in_demo - num_frames_to_stack)
+        seq_end_index = min(demo_length, index_in_demo + seq_length)
+
+        # determine sequence padding
+        seq_begin_pad = max(0, num_frames_to_stack - index_in_demo)  # pad for frame stacking
+        seq_end_pad = max(0, index_in_demo + seq_length - demo_length)  # pad for sequence length
+
+        # make sure we are not padding if specified.
+        if not self.pad_frame_stack:
+            assert seq_begin_pad == 0
+        if not self.pad_seq_length:
+            assert seq_end_pad == 0
+
+        # fetch observation from the dataset file
+        seq = dict()
+        for k in keys:
+            data = self.get_dataset_for_goal(ep, k)
+            seq[k] = data[seq_begin_index: seq_end_index]
+
+        seq = TensorUtils.pad_sequence(seq, padding=(seq_begin_pad, seq_end_pad), pad_same=True)
+        pad_mask = np.array([0] * seq_begin_pad + [1] * (seq_end_index - seq_begin_index) + [0] * seq_end_pad)
+        pad_mask = pad_mask[:, None].astype(bool)
+
+        return seq, pad_mask
 
     def get_obs_sequence_from_demo(self, demo_id, index_in_demo, keys, num_frames_to_stack=0, seq_length=1, prefix="obs"):
         """
@@ -535,6 +678,33 @@ class SequenceDataset(torch.utils.data.Dataset):
             seq_length=seq_length,
         )
         obs = {k.split('/')[1]: obs[k] for k in obs}  # strip the prefix
+        if self.get_pad_mask:
+            obs["pad_mask"] = pad_mask
+
+        return obs
+    
+    def get_obs_sequence_goal_from_demo(self, ep, keys, num_frames_to_stack=0, seq_length=1, prefix="obs"):
+        """
+        Extract a (sub)sequence of observation items from a demo given the @keys of the items.
+
+        Args:
+            demo_id (str): id of the demo, e.g., demo_0
+            index_in_demo (int): beginning index of the sequence wrt the demo
+            keys (tuple): list of keys to extract
+            num_frames_to_stack (int): numbers of frame to stack. Seq gets prepended with repeated items if out of range
+            seq_length (int): sequence length to extract. Seq gets post-pended with repeated items if out of range
+            prefix (str): one of "obs", "next_obs"
+
+        Returns:
+            a dictionary of extracted items.
+        """
+        obs, pad_mask = self.get_sequence_goal_from_demo(
+            ep, 
+            keys=tuple('{}'.format(k) for k in keys),
+            num_frames_to_stack=num_frames_to_stack,
+            seq_length=seq_length,
+        )
+        # obs = {k.split('/')[1]: obs[k] for k in obs}  # strip the prefix
         if self.get_pad_mask:
             obs["pad_mask"] = pad_mask
 

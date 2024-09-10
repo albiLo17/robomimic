@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug with robomimic",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "CONDA_DEFAULT_ENV": "robomimic_env"
+            },
+            "pythonPath": "/home/omniverse/miniforge3/envs/robomimic/bin/python"
+        }
+    ]
+}

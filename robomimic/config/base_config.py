@@ -84,9 +84,9 @@ class BaseConfig(Config):
         self.experiment.name = "test"                               # name of experiment used to make log files
         self.experiment.validate = False                            # whether to do validation or not
         self.experiment.logging.terminal_output_to_txt = True       # whether to log stdout to txt file 
-        self.experiment.logging.log_tb = True                       # enable tensorboard logging
-        self.experiment.logging.log_wandb = False                   # enable wandb logging
-        self.experiment.logging.wandb_proj_name = "debug"           # project name if using wandb
+        self.experiment.logging.log_tb = False                       # enable tensorboard logging
+        self.experiment.logging.log_wandb = True                   # enable wandb logging
+        self.experiment.logging.wandb_proj_name = "MetricRL"           # project name if using wandb
 
 
         ## save config - if and when to save model checkpoints ##
@@ -100,7 +100,7 @@ class BaseConfig(Config):
 
         # epoch definitions - if not None, set an epoch to be this many gradient steps, else the full dataset size will be used
         self.experiment.epoch_every_n_steps = 100                   # number of gradient steps in train epoch (None for full dataset pass)
-        self.experiment.validation_epoch_every_n_steps = 10         # number of gradient steps in valid epoch (None for full dataset pass)
+        self.experiment.validation_epoch_every_n_steps = 50         # number of gradient steps in valid epoch (None for full dataset pass)
 
         # envs to evaluate model on (assuming rollouts are enabled), to override the metadata stored in dataset
         self.experiment.env = None                                  # no need to set this (unless you want to override)
@@ -110,8 +110,8 @@ class BaseConfig(Config):
         ## rendering config ##
         self.experiment.render = False                              # render on-screen or not
         self.experiment.render_video = True                         # render evaluation rollouts to videos
-        self.experiment.keep_all_videos = False                     # save all videos, instead of only saving those for saved model checkpoints
-        self.experiment.video_skip = 5                              # render video frame every n environment steps during rollout
+        self.experiment.keep_all_videos = True                     # save all videos, instead of only saving those for saved model checkpoints
+        self.experiment.video_skip = 1                              # render video frame every n environment steps during rollout
 
 
         ## evaluation rollout config ##
@@ -121,6 +121,8 @@ class BaseConfig(Config):
         self.experiment.rollout.rate = 50                           # do rollouts every @rate epochs
         self.experiment.rollout.warmstart = 0                       # number of epochs to wait before starting rollouts
         self.experiment.rollout.terminate_on_success = True         # end rollout early after task success
+        self.experiment.rollout.goal_path = None                    # path where the goal hdf5 file is stored
+        
 
     def train_config(self):
         """
@@ -138,7 +140,7 @@ class BaseConfig(Config):
         # The "log" directory will contain tensorboard and stdout txt logs. The "models" directory
         # will contain saved model checkpoints. The "videos" directory contains evaluation rollout
         # videos.
-        self.train.output_dir = "../{}_trained_models".format(self.algo_name)
+        self.train.output_dir = "../output/{}_trained_models".format(self.algo_name)
 
 
         ## dataset loader config ##

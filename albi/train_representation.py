@@ -25,6 +25,10 @@ import psutil
 import sys
 import socket
 import traceback
+import wandb
+import robomimic.utils.log_utils as LogUtils
+from tqdm import tqdm
+
 
 from collections import OrderedDict
 
@@ -40,7 +44,101 @@ import robomimic.utils.file_utils as FileUtils
 from robomimic.config import config_factory
 from robomimic.algo import algo_factory, RolloutPolicy
 from robomimic.utils.log_utils import PrintLogger, DataLogger, flush_warnings
+import matplotlib.pyplot as plt
+import h5py
 
+def plot_representation(model, train_data, device, input_obs_dict, demo_index=0, file_name=None):
+    model.set_eval()
+    f = train_data.hdf5_file
+    demos = list(f["data"].keys())
+    # print(demos)
+    demos.sort(key=lambda x: int(x.split('_')[1]))
+    demo_key = demos[demo_index]
+    # print(demo_key)
+    demo_grp = f["data"][demo_key]
+
+    # Retrieve the observations and actions
+ # Get all timesteps for this modality
+    obs = {}
+    for k in input_obs_dict:
+        obs[k] = torch.tensor(demo_grp["obs/{}".format(k)][:],dtype=torch.float32).to(device)  # Get all timesteps for this modality
+    g_t = {k: obs[k][-1].unsqueeze(0) for k in input_obs_dict}
+
+    with torch.no_grad():
+        z = model.nets["critic"](obs, g_t)
+        z_g = model.nets["critic"]( g_t, g_t)
+
+        distances = model.get_distance(z, z_g).cpu().numpy()
+    # Get predicted actions by the model
+    # for t in range(len(ground_truth_actions)):
+    #     # Prepare the observation for the model
+    #     obs_t = {k: torch.tensor(obs[k][t],dtype=torch.float32).unsqueeze(0).to(device) for k in input_obs_dict}
+    #     # print(obs_t["robot0_eef_pos"].shape)
+    #     # print(g_t["robot0_eef_pos"].shape)
+    #     # Model forward pass
+    #     with torch.no_grad():
+    #         z = model.nets["critic"](obs_t, g_t)
+    #         z_g = model.nets["critic"]( g_t, g_t)
+    #         distances.append(distance.cpu().numpy())    
+            
+    # plot distances from the goal of the representation
+    plt.figure()
+    distances = np.array(distances)
+    plt.figure(figsize=(10, 6))
+    plt.plot(distances, label='Distance between representation and goal')
+    plt.xlabel('Timestep')
+    plt.ylabel('Distance')
+    plt.title(f'Distance for each timestep in trajectory {demo_index}')
+    plt.legend()
+    
+    if file_name:
+        plt.savefig(file_name)
+        plt.close()  # Close the plot to avoid display during training
+    else:
+        plt.show()
+        
+    if z.shape[1] == 2:
+        plt.figure()
+        z = z.cpu().numpy()
+        z_g = z_g.cpu().numpy()
+        plt.figure()
+        plt.scatter(z[:, 0], z[:, 1], c=range(z.shape[0]), cmap='viridis')
+        plt.scatter(z_g[:, 0], z_g[:, 1], c='red', marker='x', label='Goal')
+        # plt.colorbar()
+        plt.title(f'Representation for trajectory {demo_index}')
+        if file_name:
+            plt.savefig(file_name.replace('/epoch', '/representation_epoch'))
+            plt.close()
+            
+        # select other trajs to plot
+        plt.figure()
+        for i in range(1, 7):
+            random_idx = np.random.randint(0, len(demos))
+            # print(f"Random index: {random_idx}")
+            demo_grp = f["data"][demos[random_idx]]
+            obs = {}
+            for k in input_obs_dict:
+                obs[k] = torch.tensor(demo_grp["obs/{}".format(k)][:],dtype=torch.float32).to(device)  # Get all timesteps for this modality
+            next_obs = {}
+            for k in input_obs_dict:
+                next_obs[k] = torch.tensor(demo_grp["next_obs/{}".format(k)][:],dtype=torch.float32).to(device) 
+                
+            anchor = {k: next_obs[k][-1].unsqueeze(0) for k in input_obs_dict}
+            with torch.no_grad():
+                z = model.nets["critic"](obs, anchor)
+                z_g = model.nets["critic"]( anchor, anchor)
+            
+            z = z.cpu().numpy()
+            z_g = z_g.cpu().numpy()
+            plt.scatter(z[:, 0], z[:, 1], c=range(z.shape[0]), cmap='viridis')
+            plt.scatter(z_g[:, 0], z_g[:, 1], c='red', marker='x', label='Goal')
+            
+        if file_name:
+            plt.savefig(file_name.replace('/epoch', '/anchor_state_epoch'))
+            plt.close()
+            
+    model.set_train()
+                
 
 def train(config, device):
     """
@@ -57,12 +155,18 @@ def train(config, device):
     print(config)
     print("")
     log_dir, ckpt_dir, video_dir = TrainUtils.get_exp_dir(config)
+    # get the parent of checkpoint directory
+    base_output_dir = os.path.dirname(ckpt_dir)
+    fig_dir = os.path.join(base_output_dir, "images")
+    if os.path.exists(fig_dir):
+        shutil.rmtree(fig_dir)
+    os.makedirs(fig_dir)
 
-    if config.experiment.logging.terminal_output_to_txt:
-        # log stdout and stderr to a text file
-        logger = PrintLogger(os.path.join(log_dir, 'log.txt'))
-        sys.stdout = logger
-        sys.stderr = logger
+    # if config.experiment.logging.terminal_output_to_txt:
+    #     # log stdout and stderr to a text file
+    #     logger = PrintLogger(os.path.join(log_dir, 'log.txt'))
+    #     sys.stdout = logger
+    #     sys.stderr = logger
 
     # read config to set up metadata for observation modalities (e.g. detecting rgb observations)
     ObsUtils.initialize_obs_utils_with_config(config)
@@ -96,9 +200,6 @@ def train(config, device):
                 env_names.append(name)
 
         for env_name in env_names:
-            goal_path = None
-            if config.use_goals:
-                goal_path = config.experiment.rollout.goal_path
             env = EnvUtils.create_env_from_metadata(
                 env_meta=env_meta,
                 env_name=env_name, 
@@ -106,7 +207,6 @@ def train(config, device):
                 render_offscreen=config.experiment.render_video,
                 use_image_obs=shape_meta["use_images"],
                 use_depth_obs=shape_meta["use_depths"],
-                goal_path=goal_path
             )
             env = EnvUtils.wrap_env_from_config(env, config=config) # apply environment warpper, if applicable
             envs[env.name] = env
@@ -195,15 +295,38 @@ def train(config, device):
     # number of learning steps per epoch (defaults to a full dataset pass)
     train_num_steps = config.experiment.epoch_every_n_steps
     valid_num_steps = config.experiment.validation_epoch_every_n_steps
+    
+    model.set_train()
+    num_steps = len(train_loader)
+    step_log_all = []
+    timing_stats = dict(Data_Loading=[], Process_Batch=[], Train_Batch=[], Log_Info=[])
+    
+    
+    progress_bar = tqdm(range(1, config.train.num_epochs + 1), desc="Training", leave=True)
+    
+    for epoch in progress_bar: # epoch numbers start at 1
 
-    for epoch in range(1, config.train.num_epochs + 1): # epoch numbers start at 1
-        step_log = TrainUtils.run_epoch(
-            model=model,
-            data_loader=train_loader,
-            epoch=epoch,
-            num_steps=train_num_steps,
-            obs_normalization_stats=obs_normalization_stats,
-        )
+        data_loader_iter = iter(train_loader)
+        # for _ in LogUtils.custom_tqdm(range(num_steps)):        
+        for _ in range(num_steps):
+            batch = next(data_loader_iter)
+            input_batch = model.process_batch_for_training(batch)
+            input_batch = model.postprocess_batch_for_training(input_batch, obs_normalization_stats=obs_normalization_stats)
+            # TODO: train only the critic
+            info = model.train_critic(input_batch, epoch, validate=False)
+            step_log_model = model.log_info(info, only_critic=True)
+            step_log_all.append(step_log_model)
+            
+        # flatten and take the mean of the metrics
+        step_log_dict = {}
+        for i in range(len(step_log_all)):
+            for k in step_log_all[i]:
+                if k not in step_log_dict:
+                    step_log_dict[k] = []
+                step_log_dict[k].append(step_log_all[i][k])
+        step_log = dict((k, float(np.mean(v))) for k, v in step_log_dict.items())
+
+        ##############################
         model.on_epoch_end(epoch)
 
         # setup checkpoint path
@@ -211,106 +334,26 @@ def train(config, device):
 
         # check for recurring checkpoint saving conditions
         should_save_ckpt = False
-        if config.experiment.save.enabled:
-            time_check = (config.experiment.save.every_n_seconds is not None) and \
-                (time.time() - last_ckpt_time > config.experiment.save.every_n_seconds)
-            epoch_check = (config.experiment.save.every_n_epochs is not None) and \
-                (epoch > 0) and (epoch % config.experiment.save.every_n_epochs == 0)
-            epoch_list_check = (epoch in config.experiment.save.epochs)
-            should_save_ckpt = (time_check or epoch_check or epoch_list_check)
-        ckpt_reason = None
-        if should_save_ckpt:
-            last_ckpt_time = time.time()
-            ckpt_reason = "time"
-
-        print("Train Epoch {}".format(epoch))
-        print(json.dumps(step_log, sort_keys=True, indent=4))
+        if epoch % config.experiment.save.every_n_epochs == 0:
+            should_save_ckpt = True
+            ckpt_reason = "epochs"
+            
+        if epoch % 10 == 0:
+            plot_filename = fig_dir + f"/epoch_{epoch}.png"
+            # select random demo index
+            demo_idx = np.random.randint(0, len(trainset.demos))
+            # demo_idx = 167
+            plot_representation(model, trainset, device, input_obs_dict=config.observation.modalities.obs.low_dim, demo_index=demo_idx, file_name=plot_filename)
+            # data_logger._wandb_logger.log({f"Reprsentation": wandb.Image(plot_filename)})
         for k, v in step_log.items():
-            if k.startswith("Time_"):
-                data_logger.record("Timing_Stats/Train_{}".format(k[5:]), v, epoch)
-            else:
-                data_logger.record("Train/{}".format(k), v, epoch)
+            data_logger.record("Train/{}".format(k), v, epoch)
+                
+        # Update the progress bar with loss values
+        progress_bar.set_postfix({
+            'L Neg': step_log["critic/l_neg"],
+            'L Pos': step_log["critic/l_pos"]
+        })
 
-        # Evaluate the model on validation set
-        if config.experiment.validate:
-            with torch.no_grad():
-                step_log = TrainUtils.run_epoch(model=model, data_loader=valid_loader, epoch=epoch, validate=True, num_steps=valid_num_steps)
-            for k, v in step_log.items():
-                if k.startswith("Time_"):
-                    data_logger.record("Timing_Stats/Valid_{}".format(k[5:]), v, epoch)
-                else:
-                    data_logger.record("Valid/{}".format(k), v, epoch)
-
-            print("Validation Epoch {}".format(epoch))
-            print(json.dumps(step_log, sort_keys=True, indent=4))
-
-            # save checkpoint if achieve new best validation loss
-            valid_check = "Loss" in step_log
-            if valid_check and (best_valid_loss is None or (step_log["Loss"] <= best_valid_loss)):
-                best_valid_loss = step_log["Loss"]
-                if config.experiment.save.enabled and config.experiment.save.on_best_validation:
-                    epoch_ckpt_name += "_best_validation_{}".format(best_valid_loss)
-                    should_save_ckpt = True
-                    ckpt_reason = "valid" if ckpt_reason is None else ckpt_reason
-
-        # Evaluate the model by by running rollouts
-
-        # do rollouts at fixed rate or if it's time to save a new ckpt
-        video_paths = None
-        rollout_check = (epoch % config.experiment.rollout.rate == 0) or (should_save_ckpt and ckpt_reason == "time")
-        if config.experiment.rollout.enabled and (epoch > config.experiment.rollout.warmstart) and rollout_check:
-
-            # wrap model as a RolloutPolicy to prepare for rollouts
-            rollout_model = RolloutPolicy(model, obs_normalization_stats=obs_normalization_stats)
-
-            num_episodes = config.experiment.rollout.n
-            all_rollout_logs, video_paths = TrainUtils.rollout_with_stats(
-                policy=rollout_model,
-                envs=envs,
-                horizon=config.experiment.rollout.horizon,
-                use_goals=config.use_goals,
-                num_episodes=num_episodes,
-                render=False,
-                video_dir=video_dir if config.experiment.render_video else None,
-                epoch=epoch,
-                video_skip=config.experiment.get("video_skip", 5),
-                terminate_on_success=config.experiment.rollout.terminate_on_success,
-            )
-
-            # summarize results from rollouts to tensorboard and terminal
-            for env_name in all_rollout_logs:
-                rollout_logs = all_rollout_logs[env_name]
-                for k, v in rollout_logs.items():
-                    if k.startswith("Time_"):
-                        data_logger.record("Timing_Stats/Rollout_{}_{}".format(env_name, k[5:]), v, epoch)
-                    else:
-                        data_logger.record("Rollout/{}/{}".format(k, env_name), v, epoch, log_stats=True)
-
-                print("\nEpoch {} Rollouts took {}s (avg) with results:".format(epoch, rollout_logs["time"]))
-                print('Env: {}'.format(env_name))
-                print(json.dumps(rollout_logs, sort_keys=True, indent=4))
-
-            # checkpoint and video saving logic
-            updated_stats = TrainUtils.should_save_from_rollout_logs(
-                all_rollout_logs=all_rollout_logs,
-                best_return=best_return,
-                best_success_rate=best_success_rate,
-                epoch_ckpt_name=epoch_ckpt_name,
-                save_on_best_rollout_return=config.experiment.save.on_best_rollout_return,
-                save_on_best_rollout_success_rate=config.experiment.save.on_best_rollout_success_rate,
-            )
-            best_return = updated_stats["best_return"]
-            best_success_rate = updated_stats["best_success_rate"]
-            epoch_ckpt_name = updated_stats["epoch_ckpt_name"]
-            should_save_ckpt = (config.experiment.save.enabled and updated_stats["should_save_ckpt"]) or should_save_ckpt
-            if updated_stats["ckpt_reason"] is not None:
-                ckpt_reason = updated_stats["ckpt_reason"]
-
-        # Only keep saved videos if the ckpt should be saved (but not because of validation score)
-        should_save_video = (should_save_ckpt and (ckpt_reason != "valid")) or config.experiment.keep_all_videos
-        if video_paths is not None and not should_save_video:
-            for env_name in video_paths:
-                os.remove(video_paths[env_name])
 
         # Save model checkpoints based on conditions (success rate, validation loss, etc)
         if should_save_ckpt:
@@ -323,11 +366,6 @@ def train(config, device):
                 obs_normalization_stats=obs_normalization_stats,
             )
 
-        # Finally, log memory usage in MB
-        process = psutil.Process(os.getpid())
-        mem_usage = int(process.memory_info().rss / 1000000)
-        data_logger.record("System/RAM Usage (MB)", mem_usage, epoch)
-        print("\nEpoch {} Memory Usage: {} MB\n".format(epoch, mem_usage))
 
     # terminate logging
     data_logger.close()
@@ -345,6 +383,13 @@ def main(args):
     else:
         config = config_factory(args.algo)
 
+    config.algo.optim_params.critic.learning_rate.initial = args.lr
+    config.algo.phi_dim = args.phi_dim
+    config.train.batch_size = args.batch_size
+    config.train.num_epochs = args.epochs
+    config.experiment.name = "Representation_lift_mg"
+    config.experiment.name = config.experiment.name + f"_rep_z_{args.phi_dim}_lr_{args.lr}_bs_{args.batch_size}_epochs_{args.epochs}"
+    
     if args.dataset is not None:
         config.train.data = args.dataset
 
@@ -353,6 +398,7 @@ def main(args):
 
     # get torch device
     device = TorchUtils.get_torch_device(try_to_use_cuda=config.train.cuda)
+    print("Using device: {}".format(device))
 
     # maybe modify config for debugging purposes
     if args.debug:
@@ -392,10 +438,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config",
         type=str,
-        # default=None,
-        # default="robomimic/exps/RAL/mrl_can.json",
-        # default="robomimic/exps/RAL/debug.json",
-        default="/home/omniverse/workspace/robomimic/robomimic/exps/RAL/crl/can_mg.json",
+        default=None,
         help="(optional) path to a config json that will be used to override the default settings. \
             If omitted, default settings are used. This is the preferred way to run experiments.",
     )
@@ -420,8 +463,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset",
         type=str,
-        default=None,
-        # default="/home/omniverse/workspace/robomimic/datasets/lift/mg/low_dim_sparse_v141_augmented.hdf5",
+        # default="/home/omniverse/workspace/robomimic/datasets/lift/ph/low_dim_v141_augmented.hdf5",
+        default="/home/omniverse/workspace/robomimic/datasets/lift/mg/low_dim_sparse_v141_augmented.hdf5",
         help="(optional) if provided, override the dataset path defined in the config",
     )
 
@@ -431,6 +474,12 @@ if __name__ == "__main__":
         action='store_true',
         help="set this flag to run a quick training run for debugging purposes"
     )
+    
+    
+    parser.add_argument("--lr", type=float, default=1e-3,  help="learning rate",)
+    parser.add_argument("--phi_dim", type=float, default=64,  help="representation dimension",)
+    parser.add_argument("--batch_size", type=float, default=1024,  help="batch size",)
+    parser.add_argument("--epochs", type=float, default=5000,  help="Numebr of training epochs",)
 
     args = parser.parse_args()
     main(args)

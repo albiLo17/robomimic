@@ -9,3 +9,6 @@ from robomimic.algo.gl import GL, GL_VAE, ValuePlanner
 from robomimic.algo.hbc import HBC
 from robomimic.algo.iris import IRIS
 from robomimic.algo.td3_bc import TD3_BC
+from robomimic.algo.mrl import MetricRL
+from robomimic.algo.crl import ContrastiveRL
+from robomimic.algo.qrl import QuasimetricRL

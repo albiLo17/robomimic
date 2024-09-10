@@ -444,7 +444,8 @@ def env_from_checkpoint(ckpt_path=None, ckpt_dict=None, env_name=None, render=Fa
     # metadata from model dict to get info needed to create environment
     env_meta = ckpt_dict["env_metadata"]
     shape_meta = ckpt_dict["shape_metadata"]
-
+    
+    config, _ = config_from_checkpoint(algo_name=ckpt_dict["algo_name"], ckpt_dict=ckpt_dict, verbose=False)
     # create env from saved metadata
     env = EnvUtils.create_env_from_metadata(
         env_meta=env_meta, 
@@ -453,8 +454,9 @@ def env_from_checkpoint(ckpt_path=None, ckpt_dict=None, env_name=None, render=Fa
         render_offscreen=render_offscreen,
         use_image_obs=shape_meta.get("use_images", False),
         use_depth_obs=shape_meta.get("use_depths", False),
+        goal_path=config.experiment.rollout.goal_path,
     )
-    config, _ = config_from_checkpoint(algo_name=ckpt_dict["algo_name"], ckpt_dict=ckpt_dict, verbose=False)
+
     env = EnvUtils.wrap_env_from_config(env, config=config) # apply environment wrapper, if applicable
     if verbose:
         print("============= Loaded Environment =============")

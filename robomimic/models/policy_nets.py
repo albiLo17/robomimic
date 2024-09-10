@@ -109,7 +109,7 @@ class ActorNetwork(MIMO_MLP):
     def _to_string(self):
         """Info to pretty print."""
         return "action_dim={}".format(self.ac_dim)
-
+    
 
 class PerturbationActorNetwork(ActorNetwork):
     """
@@ -392,6 +392,39 @@ class GaussianActorNetwork(ActorNetwork):
         msg = "action_dim={}\nfixed_std={}\nstd_activation={}\ninit_std={}\nmean_limits={}\nstd_limits={}\nlow_noise_eval={}".format(
             self.ac_dim, self.fixed_std, self.std_activation, self.init_std, self.mean_limits, self.std_limits, self.low_noise_eval)
         return msg
+    
+
+
+class MRLGaussianActorNetwork(GaussianActorNetwork):
+    """
+    Adaptation of the ActorNetwork for use in MRL.
+    """
+    
+    def get_log_prob(self, obs_dict, actions, goal_dict=None):
+        """
+        Computes the log-probabilities and entropy of the given actions under the policy distribution.
+
+        Args:
+            obs_dict (dict): batch of observations.
+            actions (torch.Tensor): batch of actions to compute log-probabilities for.
+            goal_dict (dict): if not None, batch of goal observations.
+
+        Returns:
+            log_prob (torch.Tensor): log-probabilities of the actions.
+            entropy (torch.Tensor): entropy of the policy distribution.
+        """
+        # Get the policy distribution from the network
+        dist = self.forward_train(obs_dict, goal_dict)
+        
+        # Compute log probability of the given actions
+        log_prob = dist.log_prob(actions)
+        
+        # Compute the entropy of the distribution
+        entropy = dist.entropy()
+        
+        return log_prob, entropy
+
+
 
 
 class GMMActorNetwork(ActorNetwork):

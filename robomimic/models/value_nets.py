@@ -16,6 +16,7 @@ import robomimic.utils.tensor_utils as TensorUtils
 from robomimic.models.obs_nets import MIMO_MLP
 from robomimic.models.distributions import DiscreteValueDistribution
 
+    
 
 class ValueNetwork(MIMO_MLP):
     """
@@ -126,6 +127,44 @@ class ValueNetwork(MIMO_MLP):
         return "value_bounds={}".format(self.value_bounds)
 
 
+class MRLValueNetwork(ValueNetwork):
+    """
+    Extends ValueNetwork to have an output different than 1
+    """
+    def __init__(
+        self,
+        obs_shapes,
+        mlp_layer_dims,
+        value_bounds=None,
+        goal_shapes=None,
+        output_shape=1,
+        encoder_kwargs=None,
+    ):        
+        self.output_dim = output_shape
+        super(MRLValueNetwork, self).__init__(obs_shapes, mlp_layer_dims, value_bounds, goal_shapes, encoder_kwargs)
+
+    def _get_output_shapes(self):
+        """
+        Allow subclasses to re-define outputs from @MIMO_MLP, since we won't
+        always directly predict values, but may instead predict the parameters
+        of a value distribution.
+        """
+        return OrderedDict(value=(self.output_dim,))
+
+    def output_shape(self, input_shape=None):
+        """
+        Function to compute output shape from inputs to this module. 
+
+        Args:
+            input_shape (iterable of int): shape of input. Does not include batch dimension.
+                Some modules may not need this argument, if their output does not depend 
+                on the size of the input, or if they assume fixed size input.
+
+        Returns:
+            out_shape ([int]): list of integers corresponding to output shape
+        """
+        return [self.output_dim]
+
 class ActionValueNetwork(ValueNetwork):
     """
     A basic Q (action-value) network that predicts values from observations
@@ -199,7 +238,46 @@ class ActionValueNetwork(ValueNetwork):
     def _to_string(self):
         return "action_dim={}\nvalue_bounds={}".format(self.ac_dim, self.value_bounds)
 
+class MRLActionValueNetwork(ActionValueNetwork):
+    """
+    A basic Q (action-value) network that predicts values from observations
+    and actions. Can optionally be goal conditioned on future observations.
+    """
+    def __init__(
+        self,
+        obs_shapes,
+        ac_dim,
+        mlp_layer_dims,
+        value_bounds=None,
+        goal_shapes=None,
+        encoder_kwargs=None,
+        output_shape=1,
+    ):
+        self.output_dim = output_shape
+        super(MRLActionValueNetwork, self).__init__(obs_shapes, ac_dim, mlp_layer_dims, value_bounds, goal_shapes, encoder_kwargs)
 
+    def _get_output_shapes(self):
+        """
+        Allow subclasses to re-define outputs from @MIMO_MLP, since we won't
+        always directly predict values, but may instead predict the parameters
+        of a value distribution.
+        """
+        return OrderedDict(value=(self.output_dim,))
+
+    def output_shape(self, input_shape=None):
+        """
+        Function to compute output shape from inputs to this module. 
+
+        Args:
+            input_shape (iterable of int): shape of input. Does not include batch dimension.
+                Some modules may not need this argument, if their output does not depend 
+                on the size of the input, or if they assume fixed size input.
+
+        Returns:
+            out_shape ([int]): list of integers corresponding to output shape
+        """
+        return [self.output_dim]
+        
 class DistributionalActionValueNetwork(ActionValueNetwork):
     """
     Distributional Q (action-value) network that outputs a categorical distribution over
