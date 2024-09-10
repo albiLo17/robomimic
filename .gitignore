@@ -8,6 +8,8 @@ dist/
 /iql_trained_models/
 /bc_trained_models/
 
+/slurm*
+
 # local test dataset that is lazily downloaded by example scripts
 tests/assets/test.hdf5
 tests/assets/test_v141.hdf5

@@ -263,6 +263,17 @@ def main(args):
 
     if args.name is not None:
         config.experiment.name = args.name
+        
+    # modify paths to correspond to cluster:
+    custom_path = "/home/omniverse/workspace/robomimic/"
+    cluster_path = ""
+    config.train.data = config.train.data.replace(custom_path, cluster_path)
+    print(f"Original goal path: {config.experiment.rollout.goal_path }")
+    config.experiment.rollout.goal_path =  config.experiment.rollout.goal_path.replace(custom_path, cluster_path)
+    print(f"Modified goal path: {config.experiment.rollout.goal_path }")
+    
+    print(f"Data path exist: {os.path.exists(config.train.data)}")
+    print(f"Goal path exist: {os.path.exists(config.experiment.rollout.goal_path )}")
 
     # get torch device
     device = TorchUtils.get_torch_device(try_to_use_cuda=config.train.cuda)
@@ -332,8 +343,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset",
         type=str,
-        # default=None,
-        default="datasets/lift/ph/low_dim_v141.hdf5",
+        default=None,
+        # default="datasets/lift/ph/low_dim_v141.hdf5",
         help="(optional) if provided, override the dataset path defined in the config",
     )
 
