@@ -76,7 +76,9 @@ def update_dataset(original_file_path, new_file_path):
             
             # add to the new_file["data"] the average of the last observations
             # create the "goal" group under "data"
-            # new_file.create_group("goal_obs")
+            if "goal_obs" in new_file:
+                del new_file["goal_obs"]
+            new_file.create_group("goal_obs")
             for ep in demos:
                 new_file["goal_obs"].create_group(ep)
                 for k in obs_keys:
@@ -152,8 +154,22 @@ if __name__=="__main__":
     dataset_type = "mh"
     hdf5_type = "low_dim"
     
+    for task in ["transport", "lift", "square", "can"]:
+        dataset_path = os.path.join("./datasets", task, dataset_type, f"{hdf5_type}_v141.hdf5")
+        
+        new_dataset_path = os.path.join("./datasets", task, dataset_type, f"{hdf5_type}_v141_augmented.hdf5")
+        
+        update_dataset(dataset_path, new_dataset_path)
+    
     dataset_type = "ph"
     hdf5_type = "low_dim"
+    
+    for task in ["transport", "lift", "square", "can"]:
+        dataset_path = os.path.join("./datasets", task, dataset_type, f"{hdf5_type}_v141.hdf5")
+        
+        new_dataset_path = os.path.join("./datasets", task, dataset_type, f"{hdf5_type}_v141_augmented.hdf5")
+        
+        update_dataset(dataset_path, new_dataset_path)
     
     dataset_type = "mg"
     hdf5_type = "low_dim_sparse"

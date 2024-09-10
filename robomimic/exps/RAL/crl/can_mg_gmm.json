@@ -7,7 +7,7 @@
             "terminal_output_to_txt": true,
             "log_tb": false,
             "log_wandb": true,
-            "wandb_proj_name": "MetricRL"
+            "wandb_proj_name": "MetricRL_Baselines"
         },
         "save": {
             "enabled": true,
@@ -37,7 +37,7 @@
     },
     "train": {
         "data": "/home/omniverse/workspace/robomimic/datasets/can/mg/low_dim_sparse_v141_augmented.hdf5",
-        "output_dir": "../output/mrl_trained_models_ds",
+        "output_dir": "../output/crl_trained_models_ds",
         "num_data_workers": 0,
         "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,
@@ -61,9 +61,9 @@
         "seed": 1
     },
     "algo": {
-        "phi_dim":64,
-        "pre_train":false,
-        "pre_train_epochs":500,
+        "phi_dim": 64,
+        "pre_train": false,
+        "pre_train_epochs": 500,
         "optim_params": {
             "critic": {
                 "learning_rate": {

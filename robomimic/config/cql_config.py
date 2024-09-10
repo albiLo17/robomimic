@@ -60,6 +60,10 @@ class CQLConfig(BaseConfig):
         self.algo.actor.net.gaussian.fixed_std = False                      # Whether to learn std dev or not
 
         self.algo.actor.layer_dims = (300, 400)                             # actor MLP layer dimensions
+        
+        
+        self.algo.actor.net.gmm.num_modes = 5                               # number of GMM modes
+        self.algo.actor.net.gmm.min_std = 0.0001                            # minimum std output from network
 
         # ================== Critic Network Config ===================
         self.algo.critic.use_huber = False                                  # Huber Loss instead of L2 for critic
@@ -80,3 +84,10 @@ class CQLConfig(BaseConfig):
         self.algo.critic.ensemble.n = 2                                     # number of Q networks in the ensemble
 
         self.algo.critic.layer_dims = (300, 400)                            # critic MLP layer dimensions
+        
+                # ================== Adv Config ==============================
+        self.algo.adv.clip_adv_value = None                                 # whether to clip raw advantage estimates
+        self.algo.adv.beta = 1.0                                            # temperature for operator
+        self.algo.adv.use_final_clip = True                                 # whether to clip final weight calculations
+
+        self.algo.vf_quantile = 0.9                                         # quantile factor in quantile regression

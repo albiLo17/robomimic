@@ -133,9 +133,9 @@ def train(config, device):
     with open(os.path.join(log_dir, '..', 'config.json'), 'w') as outfile:
         json.dump(config, outfile, indent=4)
 
-    print("\n============= Model Summary =============")
-    print(model)  # print model summary
-    print("")
+    # print("\n============= Model Summary =============")
+    # print(model)  # print model summary
+    # print("")
 
     # load training data
     trainset, validset = TrainUtils.load_data_for_training(
@@ -395,7 +395,7 @@ if __name__ == "__main__":
         # default=None,
         # default="robomimic/exps/RAL/mrl_can.json",
         # default="robomimic/exps/RAL/debug.json",
-        default="/home/omniverse/workspace/robomimic/robomimic/exps/RAL/crl/can_mg.json",
+        default="/home/omniverse/workspace/robomimic/robomimic/exps/RAL/bcq/can_ph.json",
         help="(optional) path to a config json that will be used to override the default settings. \
             If omitted, default settings are used. This is the preferred way to run experiments.",
     )

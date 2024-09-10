@@ -16,7 +16,8 @@
 
 
 # Define the tasks and datasets
-methods=("mrl" "crl")
+methods=("mrl")
+# methods=("mrl" "crl")
 tasks=("can" "lift")
 datasets=("mg")
 # Loop over each method
@@ -38,7 +39,7 @@ do
             python robomimic/scripts/train.py --config "$config_file"
 
             # Construct the models directory path
-            models_dir="output/mrl_trained_models_ds_0909/${method}_${task}_${dataset}/"
+            models_dir="output/mrl_trained_models_ds/${method}_${task}_${dataset}/"
 
             # Get the name of the first folder inside the models directory
             model_folder=$(ls -d "$models_dir"*/ | head -1)
@@ -55,7 +56,7 @@ do
             
             # Run the evaluation script using the found model folder
             echo "Running evaluation for model folder: $model_folder"
-            python albi/evaluate_model_different_stages.py --agent "$model_folder"
+            python albi/parallel_eval_different_stages.py --agent "$model_folder"
         done
     done
 done
@@ -63,7 +64,8 @@ done
 
 
 # Define the tasks and datasets
-methods=("mrl" "crl")
+methods=("mrl")
+# methods=("mrl" "crl")
 tasks=("can" "lift") # "square" "transport")
 datasets=("ph" "mh")
 # Loop over each method
@@ -85,7 +87,7 @@ do
             python robomimic/scripts/train.py --config "$config_file"
 
             # Construct the models directory path
-            models_dir="output/mrl_trained_models_ds_0909/${method}_${task}_${dataset}/"
+            models_dir="output/mrl_trained_models_ds/${method}_${task}_${dataset}/"
 
             # Get the name of the first folder inside the models directory
             model_folder=$(ls -d "$models_dir"*/ | head -1)
@@ -102,7 +104,7 @@ do
             
             # Run the evaluation script using the found model folder
             echo "Running evaluation for model folder: $model_folder"
-            python albi/evaluate_model_different_stages.py --agent "$model_folder"
+            python albi/parallel_eval_different_stages.py --agent "$model_folder"
         done
     done
 done
