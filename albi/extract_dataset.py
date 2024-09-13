@@ -88,7 +88,6 @@ def update_dataset(original_file_path, new_file_path):
                 
             # Now you can modify the new file
             for ep in demos:
-                new_file["data"][ep].attrs["num_samples"] += 1
                 # do it twice to make sure that the anchor state will be propertly loaded for training the representation
                 for i in range(1):
                     # Read the data
@@ -100,7 +99,8 @@ def update_dataset(original_file_path, new_file_path):
                     next_obs = {k: v[:] for k, v in new_file["data"][ep]["next_obs"].items()}
                     
                     # only append if the last done is 1
-                    if dones[-1] == 1:
+                    if dones[-1] == 1:                        
+                        new_file["data"][ep].attrs["num_samples"] += 1
                         # Augment the data
                         augmented_actions = np.concatenate([actions, np.zeros((1, actions[0].shape[0]))], axis=0)
                         augmented_dones = np.concatenate([dones, np.ones((1))], axis=0)
