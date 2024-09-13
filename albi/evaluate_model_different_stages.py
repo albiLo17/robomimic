@@ -71,6 +71,23 @@ import robomimic.utils.obs_utils as ObsUtils
 from robomimic.envs.env_base import EnvBase
 from robomimic.algo import RolloutPolicy
 
+def filter_obs(obs, dict_keys):
+    """
+    Helper function to filter out only the keys in the dictionary that are in dict_keys
+
+    Args:
+        obs (dict): dictionary of observations
+        dict_keys (list): list of keys to keep in the dictionary
+
+    Returns:
+        filtered_obs (dict): dictionary of observations with only the keys in dict_keys
+    """
+    filtered_obs = {}
+    for k in dict_keys:
+        if k in obs:
+            filtered_obs[k] = obs[k]
+    return filtered_obs
+
 
 def rollout(policy, env, horizon, use_goals=False, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None):
     """
@@ -97,6 +114,19 @@ def rollout(policy, env, horizon, use_goals=False, render=False, video_writer=No
     assert isinstance(env, EnvBase)
     assert isinstance(policy, RolloutPolicy)
     assert not (render and (video_writer is not None))
+    
+
+    # extract keys in the same order of the dataloader
+    if policy.policy.global_config.ALGO_NAME == "qrl":
+        obs_key = sorted(tuple(set([
+            obs_key for group in [
+                    policy.policy.obs_config.modalities.obs.values(),
+                    policy.policy.obs_config.modalities.goal.values()
+                ]
+                for modality in group
+                for obs_key in modality
+            ])))
+
 
     policy.start_episode()
     obs = env.reset()
@@ -120,7 +150,10 @@ def rollout(policy, env, horizon, use_goals=False, render=False, video_writer=No
         for step_i in range(horizon):
 
             # get action from policy
-            act = policy(ob=obs, goal=goal_dict if use_goals else None)
+            if policy.policy.global_config.ALGO_NAME == "qrl":
+                act = policy(ob=filter_obs(obs, obs_key), goal=filter_obs(goal_dict, obs_key) if use_goals else None)
+            else:
+                act = policy(ob=obs, goal=goal_dict if use_goals else None)
 
             # play action
             next_obs, r, done, _ = env.step(act)
@@ -300,7 +333,8 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--agent_path",
-        default= "output/mrl_trained_models_ds/MetricRL_lift_mg/20240908211204/models",
+        default= "cluster_output/qrl_trained_models_ds/qrl_can_mg/20240910174015/models",
+        # default= "cluster_output/mrl_trained_models_ds/mrl_can_ph/20240910174015/models",
         type=str,
         help="path to saved checkpoint pth file",
     )

@@ -104,15 +104,16 @@ def process_json_files_in_folder(folder_path, new_attributes, delete_attributes)
 
 if __name__ == "__main__":
     # Path to the folder containing JSON files
-    # folder_path = "robomimic/exps/RAL/bc"
+    folder_path = "robomimic/exps/RAL/bc"
     
     # # Define the new attributes to update (customize as needed)
-    # new_attributes = {
-    #     "algo_name": "bc",
-    #     "train.num_epochs": 2000,  # Example of new epoch values
-    # }
-    # delete_attributes = ["train.epochs"]    
-    # process_json_files_in_folder(folder_path, new_attributes, delete_attributes)
+    new_attributes = {
+        "algo_name": "bc",
+        "train.num_epochs": 2000,  # Example of new epoch values
+        "observation.modalities.goal.low_dim": []
+    }
+    delete_attributes = ["train.epochs"]    
+    process_json_files_in_folder(folder_path, new_attributes, delete_attributes)
     
     algos = ["bc", "bcq", "cql", "crl", "iql", "mrl", "qrl"]
     
@@ -122,7 +123,8 @@ if __name__ == "__main__":
         new_attributes = {
             "algo_name": algo,
             "train.num_epochs": 2000,  # Example of new epoch values
-            "experiment.logging.wandb_proj_name": "MetricRL_Baselines"
+            "experiment.logging.wandb_proj_name": "MetricRL_Baselines",
+            "observation.modalities.goal.low_dim": []
         }
         
         # Define the attributes to delete (customize as needed)    

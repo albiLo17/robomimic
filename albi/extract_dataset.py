@@ -98,32 +98,34 @@ def update_dataset(original_file_path, new_file_path):
                     states = new_file["data"][ep]["states"][:]
                     obs = {k: v[:] for k, v in new_file["data"][ep]["obs"].items()}
                     next_obs = {k: v[:] for k, v in new_file["data"][ep]["next_obs"].items()}
+                    
+                    # only append if the last done is 1
+                    if dones[-1] == 1:
+                        # Augment the data
+                        augmented_actions = np.concatenate([actions, np.zeros((1, actions[0].shape[0]))], axis=0)
+                        augmented_dones = np.concatenate([dones, np.ones((1))], axis=0)
+                        augmented_rewards = np.concatenate([rewards, rewards[-1][None]], axis=0)
+                        augmented_states = np.concatenate([states, states[-1][None,:]], axis=0)
+                        augmented_obs = {k: np.concatenate([v, next_obs[k][-1][None,:]], axis=0) for k, v in obs.items()}
+                        augmented_next_obs = {k: np.concatenate([v, np.zeros_like(v[-1])[None,:]], axis=0) for k, v in next_obs.items()}
 
-                    # Augment the data
-                    augmented_actions = np.concatenate([actions, np.zeros((1, actions[0].shape[0]))], axis=0)
-                    augmented_dones = np.concatenate([dones, np.ones((1))], axis=0)
-                    augmented_rewards = np.concatenate([rewards, rewards[-1][None]], axis=0)
-                    augmented_states = np.concatenate([states, states[-1][None,:]], axis=0)
-                    augmented_obs = {k: np.concatenate([v, next_obs[k][-1][None,:]], axis=0) for k, v in obs.items()}
-                    augmented_next_obs = {k: np.concatenate([v, np.zeros_like(v[-1])[None,:]], axis=0) for k, v in next_obs.items()}
+                        # Delete the old datasets
+                        del new_file["data"][ep]["actions"]
+                        del new_file["data"][ep]["dones"]
+                        del new_file["data"][ep]["rewards"]
+                        del new_file["data"][ep]["states"]
+                        for k in new_file["data"][ep]["obs"].keys():
+                            del new_file["data"][ep]["obs"][k]
+                            del new_file["data"][ep]["next_obs"][k]
 
-                    # Delete the old datasets
-                    del new_file["data"][ep]["actions"]
-                    del new_file["data"][ep]["dones"]
-                    del new_file["data"][ep]["rewards"]
-                    del new_file["data"][ep]["states"]
-                    for k in new_file["data"][ep]["obs"].keys():
-                        del new_file["data"][ep]["obs"][k]
-                        del new_file["data"][ep]["next_obs"][k]
-
-                    # Create new datasets with the augmented data
-                    new_file["data"][ep].create_dataset("actions", data=augmented_actions)
-                    new_file["data"][ep].create_dataset("dones", data=augmented_dones)
-                    new_file["data"][ep].create_dataset("rewards", data=augmented_rewards)
-                    new_file["data"][ep].create_dataset("states", data=augmented_states)
-                    for k in augmented_obs.keys():
-                        new_file["data"][ep]["obs"].create_dataset(k, data=augmented_obs[k])
-                        new_file["data"][ep]["next_obs"].create_dataset(k, data=augmented_next_obs[k])
+                        # Create new datasets with the augmented data
+                        new_file["data"][ep].create_dataset("actions", data=augmented_actions)
+                        new_file["data"][ep].create_dataset("dones", data=augmented_dones)
+                        new_file["data"][ep].create_dataset("rewards", data=augmented_rewards)
+                        new_file["data"][ep].create_dataset("states", data=augmented_states)
+                        for k in augmented_obs.keys():
+                            new_file["data"][ep]["obs"].create_dataset(k, data=augmented_obs[k])
+                            new_file["data"][ep]["next_obs"].create_dataset(k, data=augmented_next_obs[k])
                         
             print("Dataset updated successfully")
             print(f"New dataset saved at {new_file_path}")

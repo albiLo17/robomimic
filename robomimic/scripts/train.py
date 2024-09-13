@@ -394,8 +394,9 @@ if __name__ == "__main__":
         type=str,
         # default=None,
         # default="robomimic/exps/RAL/mrl_can.json",
-        # default="robomimic/exps/RAL/debug.json",
-        default="/home/omniverse/workspace/robomimic/robomimic/exps/RAL/bcq/can_ph.json",
+        # default="robomimic/exps/RAL/debug_bc.json",
+        default="robomimic/exps/RAL/debug.json",
+        # default="/home/omniverse/workspace/robomimic/robomimic/exps/RAL/bcq/can_ph.json",
         help="(optional) path to a config json that will be used to override the default settings. \
             If omitted, default settings are used. This is the preferred way to run experiments.",
     )
@@ -404,7 +405,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--algo",
         type=str,
-        default="mrl",
+        default="qrl",
         help="(optional) name of algorithm to run. Only needs to be provided if --config is not provided",
     )
 

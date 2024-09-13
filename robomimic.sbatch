@@ -2,7 +2,7 @@
 #SBATCH --mem=16GB
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=2
-## #SBATCH --constrain='balrog|belegost|gondor|khazadum|rivendell|shelob|shire|smaug'
+#SBATCH --constrain='balrog|belegost|khazadum|rivendell|shelob|shire|smaug'
 
 source "/Midgard/home/longhini/miniconda3/etc/profile.d/conda.sh"
 conda activate robomimi

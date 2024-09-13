@@ -35,6 +35,9 @@ class MLP_Conditioned(nn.Module):
         super().__init__()
 
         hidden = 64
+        self._goal_conditioned = False
+        if goal_dim > 0:
+            self._goal_conditioned = True
         self.f = nn.Sequential(nn.Linear(input_dim+goal_dim, hidden),
                                nn.ReLU(),
                                nn.Linear(hidden, hidden),
@@ -47,10 +50,11 @@ class MLP_Conditioned(nn.Module):
         # check if x is a dictionary
         if isinstance(x, dict):
             x = torch.cat([x[key] for key in sorted(x.keys())], dim=-1)
-        if isinstance(goal, dict):
-            goal = torch.cat([goal[key] for key in sorted(goal.keys())], dim=-1)
-        h = torch.cat([x, goal], -1)
-        return self.f(h)
+        if self._goal_conditioned:
+            if isinstance(goal, dict):
+                goal = torch.cat([goal[key] for key in sorted(goal.keys())], dim=-1)
+            x = torch.cat([x, goal], -1)
+        return self.f(x)
     
 
 class Policy(nn.Module):

@@ -115,9 +115,10 @@ class QuasimetricRL(PolicyAlgo, ValueAlgo):
 
         # Actor
         # TODO: check dimensions
-        state_dim = np.asarray([v for v in self.obs_shapes.values()]).sum()
+        state_dim = int(np.asarray([v for v in self.obs_shapes.values()]).sum())
+        goal_dim = int(np.asarray([v for v in self.goal_shapes.values()]).sum() )
         self.nets["pi"] = MLP_Conditioned(input_dim=state_dim,
-                                 goal_dim=state_dim,
+                                 goal_dim=goal_dim,
                                  output_dim=self.ac_dim)
         
         # critic
@@ -176,7 +177,7 @@ class QuasimetricRL(PolicyAlgo, ValueAlgo):
         return self.iqe(self.nets["g"][i](z1), self.nets["g"][i](z2))
 
     def predict(self, s, s_g):
-        mu = self.nets["actor"](s, s_g)
+        mu = self.nets["pi"](s, s_g)
         return torch.squeeze(mu).detach().cpu().numpy()
     
     def get_trans(self, z, a):
@@ -309,7 +310,7 @@ class QuasimetricRL(PolicyAlgo, ValueAlgo):
 
     def get_action(self, obs_dict, goal_dict=None):
         assert not self.nets.training
-        return self.nets["actor"](obs_dict=obs_dict, goal_dict=goal_dict)
+        return self.nets["pi"](obs_dict, goal_dict)
 
     def log_info(self, info, only_critic=False):
         log = OrderedDict()

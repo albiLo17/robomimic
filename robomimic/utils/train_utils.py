@@ -170,6 +170,25 @@ def dataset_factory(config, obs_keys, filter_by_attribute=None, dataset_path=Non
     return dataset
 
 
+def filter_obs(obs, dict_keys):
+    """
+    Helper function to filter out only the keys in the dictionary that are in dict_keys
+
+    Args:
+        obs (dict): dictionary of observations
+        dict_keys (list): list of keys to keep in the dictionary
+
+    Returns:
+        filtered_obs (dict): dictionary of observations with only the keys in dict_keys
+    """
+    filtered_obs = {}
+    for k in dict_keys:
+        if k in obs:
+            filtered_obs[k] = obs[k]
+    return filtered_obs
+
+
+
 def run_rollout(
         policy, 
         env, 
@@ -206,6 +225,18 @@ def run_rollout(
     """
     assert isinstance(policy, RolloutPolicy)
     assert isinstance(env, EnvBase) or isinstance(env, EnvWrapper)
+    
+    # extract keys in the same order of the dataloader
+    if policy.policy.global_config.ALGO_NAME == "qrl":
+        obs_key = sorted(tuple(set([
+            obs_key for group in [
+                    policy.policy.obs_config.modalities.obs.values(),
+                    policy.policy.obs_config.modalities.goal.values()
+                ]
+                for modality in group
+                for obs_key in modality
+            ])))
+
 
     policy.start_episode()
 
@@ -225,7 +256,11 @@ def run_rollout(
         for step_i in range(horizon):
 
             # get action from policy
-            ac = policy(ob=ob_dict, goal=goal_dict)
+            if policy.policy.global_config.ALGO_NAME == "qrl":
+                ac = policy(ob=filter_obs(ob_dict, obs_key), goal=filter_obs(goal_dict, obs_key) if use_goals else None)
+            else:
+                ac = policy(ob=ob_dict, goal=goal_dict if use_goals else None)
+
 
             # play action
             ob_dict, r, done, _ = env.step(ac)

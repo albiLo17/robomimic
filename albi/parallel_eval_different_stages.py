@@ -84,7 +84,7 @@ def rollout_worker(args, checkpoint, rollout_horizon, rollout_id):
         device = torch.device("cpu")
 
         # Load policy and environment inside the worker process to avoid pickling issues
-        policy, ckpt_dict = FileUtils.policy_from_checkpoint(ckpt_path=checkpoint, device=device, verbose=True)
+        policy, ckpt_dict = FileUtils.policy_from_checkpoint(ckpt_path=checkpoint, device=device, verbose=False)
         
         # read rollout settings
         rollout_num_episodes = args.n_rollouts
@@ -100,7 +100,7 @@ def rollout_worker(args, checkpoint, rollout_horizon, rollout_id):
             env_name=args.env, 
             render=args.render, 
             render_offscreen=(args.video_path is not None), 
-            verbose=True,
+            verbose=False,
         )
             
         # Create the environment from the checkpoint
@@ -109,7 +109,7 @@ def rollout_worker(args, checkpoint, rollout_horizon, rollout_id):
             env_name=args.env, 
             render=args.render, 
             render_offscreen=(args.video_path is not None), 
-            verbose=True,
+            verbose=False,
         )
         video_writer = None
 
@@ -132,6 +132,12 @@ def rollout_worker(args, checkpoint, rollout_horizon, rollout_id):
         return stats
 
     except Exception as e:
+        # create a txt file to log the errors with naming the time and algo name
+        algo_name = policy.policy.global_config.experiment.name
+        txt_file = f"{policy.policy.global_config.train.output_dir}/error_logs_{algo_name}.txt"
+        with open(txt_file, 'a') as f:
+            f.write(f"Error in rollout {rollout_id}: {e}\n  ")
+            
         print(f"Error in rollout {rollout_id}: {e}")
         return None
 
@@ -139,9 +145,11 @@ def rollout_worker(args, checkpoint, rollout_horizon, rollout_id):
 def run_trained_agent(args, max_parallel_rollouts=4):
     """Run the trained agent with parallel rollouts, capped by `max_parallel_rollouts`, using CPU only."""
     rollout_num_episodes = args.n_rollouts
-    trained_epochs = 500
+    trained_epochs = 2000
     step = 50
     success_rates = []
+    
+    max_success_rate = 0.0
 
     # Iterate through the epochs for agent evaluation
     for i in range(50, trained_epochs + 1, step):
@@ -152,21 +160,52 @@ def run_trained_agent(args, max_parallel_rollouts=4):
         args.agent.sort()
         args.agent = args.agent[0]
 
-        # Run rollouts in parallel with a limited number of workers
-        with ProcessPoolExecutor(max_workers=max_parallel_rollouts) as executor:
-            futures = []
-            for rollout_id in range(rollout_num_episodes):
-                futures.append(executor.submit(rollout_worker, args, args.agent, args.horizon, rollout_id))
+        episode_success = []
+        
+        if max_success_rate < 1.0:
+            # Run rollouts in parallel with a limited number of workers
+            with ProcessPoolExecutor(max_workers=max_parallel_rollouts) as executor:
+                futures = []
+                potential_success_rate = 1.0
+                for rollout_id in range(rollout_num_episodes):
+                    futures.append(executor.submit(rollout_worker, args, args.agent, args.horizon, rollout_id))
 
-            for future in as_completed(futures):
-                stats = future.result()  # Collect rollout stats
-                if stats is not None:
-                    success_rates.append(stats["Success_Rate"])
+                for future in as_completed(futures):
+                    stats = future.result()  # Collect rollout stats
+                    if stats is not None:
+                        success_rate = stats["Success_Rate"]
+                        success_rates.append(success_rate)
+                        episode_success.append(success_rate)
+
+                        # based on the past success rates, calculate the potential average success rate (averages over all the rollout_num_episodes)
+                        potential_success_rate = (1 * (rollout_num_episodes - len(episode_success)) + np.asarray(episode_success).sum()) / rollout_num_episodes
+                        
+                    # if success rate is 1. or the potential success rate is less than the MAX success rate, break the loop and cancel the remaining rollouts
+                    if potential_success_rate < max_success_rate:
+                        for f in futures:
+                            if not f.done():
+                                f.cancel()  # Attempt to cancel remaining rollouts
+                        break
+                    
+        # if the lenght of the success rates is less than the rollout_num_episodes, fill the remaining with 0
+        while len(success_rates) < rollout_num_episodes * (int(i/step)):  
+            success_rates.append(0.0)
+            
+        episode_success_rate = np.mean(np.asarray(episode_success))
+        if episode_success_rate > max_success_rate:
+            max_success_rate = np.mean(np.asarray(episode_success))      
+                          
+
 
     # Save and plot results as before
     success_rates = np.array(success_rates)
     success_rates = success_rates.reshape(-1, rollout_num_episodes)
     save_and_plot_results(success_rates, args.agent_path, trained_epochs, step)
+    
+    # get the best success rate and the epoch
+    best_success_rate = np.max(success_rates.mean(axis=1))
+    best_epoch = np.argmax(success_rates.mean(axis=1)) * step + 50
+    return best_success_rate, best_epoch
 
 
 def save_and_plot_results(success_rates, agent_path, trained_epochs, step):
@@ -210,7 +249,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--agent_path",
-        default= "output/mrl_trained_models_ds/MetricRL_lift_mg/20240908211204/models",
+        default= "cluster_output/mrl_trained_models_ds/mrl_can_ph/20240910174015/models",
         type=str,
         help="path to saved checkpoint pth file",
     )
@@ -289,5 +328,5 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    run_trained_agent(args, max_parallel_rollouts=8)
+    run_trained_agent(args, max_parallel_rollouts=5)
 
