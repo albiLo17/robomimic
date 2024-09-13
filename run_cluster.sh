@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 # Define the tasks and datasets
-methods=("mrl" "bc" "cql" "crl" "qrl" "bcq" "iql")
+# methods=("mrl" "bc" "cql" "crl" "qrl" "bcq" "iql")
+methods=("mrl" "bc")
 tasks=("can" "lift")
 datasets=("mg")
 
@@ -32,7 +33,8 @@ do
     done
 done
 
-methods=("mrl" "bc" "cql" "crl" "qrl" "bcq" "iql")
+# methods=("mrl" "bc" "cql" "crl" "qrl" "bcq" "iql")
+methods=("mrl" "bc")
 tasks=("can" "lift" "square" "transport")
 datasets=("ph" "mh")
 

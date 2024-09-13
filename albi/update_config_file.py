@@ -118,6 +118,7 @@ if __name__ == "__main__":
     algos = ["bc", "bcq", "cql", "crl", "iql", "mrl", "qrl"]
     
     for algo in algos:
+        print(f"Processing {algo}...")
         folder_path = f"robomimic/exps/RAL/{algo}"
         # Define the new attributes to update (customize as needed)
         new_attributes = {
