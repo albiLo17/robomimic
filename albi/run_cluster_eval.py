@@ -88,14 +88,15 @@ def run_evaluation(methods, tasks, datasets, cluster_folder, training_epochs, st
 if __name__=="__main__":
     training_epochs = 2000
     step = 50
-    parallel_rollouts = 10
+    parallel_rollouts = 15
     
     cluster_folder = "cluster_output"
     log_file = os.path.join(cluster_folder, f"evaluation_results_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
     # create output text file based on the day and time
     log_txt_file = os.path.join(cluster_folder, f"evaluation_results_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt")
     
-    methods = ["mrl", "bc", "cql", "crl", "qrl", "bcq", "iql"]
+    #methods = ["mrl", "bc", "cql", "crl", "qrl", "bcq", "iql"]
+    methods = ["mrl", "bc"]
     tasks = ["can", "lift"]
     datasets = ["mg"]
     
@@ -104,7 +105,8 @@ if __name__=="__main__":
     
     run_evaluation(methods, tasks, datasets, cluster_folder, training_epochs, step, parallel_rollouts, log_txt_file)
     
-    methods = ["mrl", "bc", "cql", "crl", "qrl", "bcq", "iql"]
+    #methods = ["mrl", "bc", "cql", "crl", "qrl", "bcq", "iql"]
+    methods = ["mrl", "bc", ]
     tasks = ["can", "lift", "square", "transport"]
     datasets = ["ph"]
     
@@ -114,7 +116,8 @@ if __name__=="__main__":
     run_evaluation(methods, tasks, datasets, cluster_folder, training_epochs, step, parallel_rollouts, log_txt_file)
         
 
-    methods = ["mrl", "bc", "cql", "crl", "qrl", "bcq", "iql"]
+    # methods = ["mrl", "bc", "cql", "crl", "qrl", "bcq", "iql"]
+    methods = ["mrl", "bc", ]
     tasks = ["can", "lift", "square", "transport"]
     datasets = ["mh"]
     

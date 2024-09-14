@@ -2,7 +2,7 @@
 
 # Define the tasks and datasets
 # methods=("mrl" "bc" "cql" "crl" "qrl" "bcq" "iql")
-methods=("mrl" "bc")
+methods=("cql" "crl" "qrl" "bcq" "iql")
 tasks=("can" "lift")
 datasets=("mg")
 
@@ -34,7 +34,7 @@ do
 done
 
 # methods=("mrl" "bc" "cql" "crl" "qrl" "bcq" "iql")
-methods=("mrl" "bc")
+methods=("cql" "crl" "qrl" "bcq" "iql")
 tasks=("can" "lift" "square" "transport")
 datasets=("ph" "mh")
 

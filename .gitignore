@@ -9,6 +9,7 @@ dist/
 /bc_trained_models/
 /cluster_output/
 /output_GC/
+/cluster_output_GC/
 
 /slurm*
 
