@@ -2,49 +2,31 @@ import os
 import h5py
 import numpy as np
 
-
-# def load_dataset(dataset_path):
-#     print("********* REMEMBER TO CHANGE THE OBS KEYS *********")
-#     # open file
-#     f = h5py.File(dataset_path, "r")
-#     # each demonstration is a group under "data"
-#     demos = list(f["data"].keys())
-#     num_demos = len(demos)
-#     print("hdf5 file {} has {} demonstrations".format(dataset_path, num_demos))
-    
-#     # each demonstration is named "demo_#" where # is a number.
-#     # Let's put the demonstration list in increasing episode order
-#     inds = np.argsort([int(elem[5:]) for elem in demos])
-#     demos = [demos[i] for i in inds]
-
-#     obs_keys = [             # specify low-dim observations for agent
-#             "robot0_eef_pos", 
-#             "robot0_eef_quat", 
-#             "robot0_gripper_qpos", 
-#             "object",
-#         ]
-#     formatted_demos = []
-#     # store the average of the observations
-#     # obs_sum = {k: np.zeros(f["data"][demos[0]]["obs"][k].shape) for k in obs_keys}
-#     for ep in demos:
-#         # augment all the observations with one more final state
-#         actions = f["data"][ep]["actions"][:]
-#         # concatenate the observations with obs_keys
-#         obs = np.concatenate([f["data"][ep]["obs"][key][:] for key in obs_keys], axis=-1)
-#         next_obs = np.concatenate([f["data"][ep]["next_obs"][key][:] for key in obs_keys], axis=-1)
-#         formatted_demos.append((obs, actions, next_obs))
-
         
-        
-def update_dataset(original_file_path, new_file_path):
-    # Open the original file in read-only mode
-    with h5py.File(original_file_path, 'r') as original_file:
+def update_dataset(original_file_path, new_file_path, proficient_dataset_path):
+    # Open the original and proficient datasets
+    with h5py.File(original_file_path, 'r') as original_file, h5py.File(proficient_dataset_path, 'r') as proficient_file:
         demos = list(original_file["data"].keys())
+        proficient_demos = list(proficient_file["data"].keys())
+        
+        # Merge proficient dataset into the original dataset
+        merged_demos = demos + proficient_demos
+        
+        # Determine the last demo number in the original file
+        last_demo_number = max([int(demo.split('_')[-1]) for demo in demos])
+        
         # Open a new file in write mode
         with h5py.File(new_file_path, 'w') as new_file:
             # Copy all items from the original file to the new file
             for item in original_file:
                 original_file.copy(item, new_file)
+                
+            # Also copy all items from the proficient file to the new file
+            # Now handle merging proficient dataset items
+            for i, demo in enumerate(proficient_demos):
+                new_demo_name = f"demo_{last_demo_number + i + 1}"  # Renaming demo to start after the last demo in the original file
+                proficient_file.copy(f"data/{demo}", new_file["data"], name=new_demo_name)
+                demos.append(new_demo_name)
                 
             obs_keys = list(original_file["data"][demos[0]]["obs"].keys())
                 
@@ -53,6 +35,8 @@ def update_dataset(original_file_path, new_file_path):
             obs_goal = {k: np.zeros(new_file["data"][demos[0]]["obs"][k][-1].shape) for k in obs_keys}
             all_obs_goal = {}
             num_demos_used = 0
+            
+            # Process the merged demos (original + proficient)
             for ep in demos:
                 # add key demo to all obs
                 all_obs_goal[ep] = {}
@@ -63,8 +47,6 @@ def update_dataset(original_file_path, new_file_path):
                     num_demos_used += 1
                     # update the average
                     for k in  obs_keys:
-                        # print(f"obs shape: {new_file['data'][ep]['obs'][k].shape}")
-                        # print(f"last shape: {new_file['data'][ep]['obs'][k][-1].shape}")
                         obs_sum[k] += new_file["data"][ep]["obs"][k][-1]
                         obs_goal[k] = new_file["data"][ep]["obs"][k][-1]
                     
@@ -126,12 +108,11 @@ def update_dataset(original_file_path, new_file_path):
                         for k in augmented_obs.keys():
                             new_file["data"][ep]["obs"].create_dataset(k, data=augmented_obs[k])
                             new_file["data"][ep]["next_obs"].create_dataset(k, data=augmented_next_obs[k])
+                            
+            new_file["data"].attrs["total"] = np.asarray([new_file["data"][ep].attrs["num_samples"] for ep in demos]).sum()
                         
             print("Dataset updated successfully")
             print(f"New dataset saved at {new_file_path}")
-            
-            new_file["data"].attrs["total"] = np.asarray([new_file["data"][ep].attrs["num_samples"] for ep in demos]).sum()
-
             
             # now create a new h5py file in the same folder containing only the
             # average of the last observations
@@ -155,37 +136,17 @@ def update_dataset(original_file_path, new_file_path):
 
 if __name__=="__main__":
     # download the dataset
-    task = "transport" # lift square transport lift
-    dataset_type = "mh"
-    hdf5_type = "low_dim"
-    
-    for task in ["transport", "lift", "square", "can"]:
-        dataset_path = os.path.join("./datasets", task, dataset_type, f"{hdf5_type}_v141.hdf5")
-        
-        new_dataset_path = os.path.join("./datasets", task, dataset_type, f"{hdf5_type}_v141_augmented.hdf5")
-        
-        update_dataset(dataset_path, new_dataset_path)
-    
-    dataset_type = "ph"
-    hdf5_type = "low_dim"
-    
-    for task in ["transport", "lift", "square", "can"]:
-        dataset_path = os.path.join("./datasets", task, dataset_type, f"{hdf5_type}_v141.hdf5")
-        
-        new_dataset_path = os.path.join("./datasets", task, dataset_type, f"{hdf5_type}_v141_augmented.hdf5")
-        
-        update_dataset(dataset_path, new_dataset_path)
-    
-    dataset_type = "mg"
+    dataset_type = "random"
     hdf5_type = "low_dim_sparse"
     
     # for task in ["transport", "lift", "square", "can"]:
-    for task in ["lift", "can"]:
+    for task in [ "can"]:
         dataset_path = os.path.join("./datasets", task, dataset_type, f"{hdf5_type}_v141.hdf5")
+        proficient_dataset_path = os.path.join("./datasets", task, "ph", f"low_dim_v141.hdf5")
         
         new_dataset_path = os.path.join("./datasets", task, dataset_type, f"{hdf5_type}_v141_augmented.hdf5")
         
-        update_dataset(dataset_path, new_dataset_path)
+        update_dataset(dataset_path, new_dataset_path, proficient_dataset_path)
     
 
     # augment all the observations with one more final state

@@ -102,15 +102,7 @@ def rollout_worker(args, checkpoint, rollout_horizon, rollout_id):
             render_offscreen=(args.video_path is not None), 
             verbose=False,
         )
-            
-        # Create the environment from the checkpoint
-        env, _ = FileUtils.env_from_checkpoint(
-            ckpt_dict=ckpt_dict, 
-            env_name=args.env, 
-            render=args.render, 
-            render_offscreen=(args.video_path is not None), 
-            verbose=False,
-        )
+
         video_writer = None
 
         print(f"Starting rollout {rollout_id} on CPU (Process: {os.getpid()})")
@@ -142,11 +134,9 @@ def rollout_worker(args, checkpoint, rollout_horizon, rollout_id):
         return None
 
 
-def run_trained_agent(args, max_parallel_rollouts=4):
+def run_trained_agent(args, max_parallel_rollouts=4, trained_epochs=2000, step=50):
     """Run the trained agent with parallel rollouts, capped by `max_parallel_rollouts`, using CPU only."""
     rollout_num_episodes = args.n_rollouts
-    trained_epochs = 2000
-    step = 50
     success_rates = []
     
     max_success_rate = 0.0

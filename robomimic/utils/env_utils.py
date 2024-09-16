@@ -236,7 +236,7 @@ def create_env_from_metadata(
         render_offscreen=render_offscreen, 
         use_image_obs=use_image_obs, 
         use_depth_obs=use_depth_obs, 
-        goal_path=goal_path,
+        #goal_path=goal_path,
         **env_kwargs,
     )
     check_env_version(env, env_meta)
