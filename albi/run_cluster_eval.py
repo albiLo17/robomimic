@@ -98,8 +98,30 @@ if __name__=="__main__":
     cluster_folder = "cluster_output"
     log_file = os.path.join(cluster_folder, f"evaluation_results_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
     # create output text file based on the day and time
-    log_txt_file = os.path.join(cluster_folder, f"evaluation_results_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt")
+    log_txt_file = os.path.join(cluster_folder, f"evaluation_results_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt")  
+      
+    methods = ["mrl", "bc"]
+    #methods = ["mrl", "bc", ]
+    tasks = ["can"]
+    datasets = ["random"]
     
+    # logging.info("Starting evaluation of the trained models")
+    print_message(f"Starting evaluation DATASET: {datasets[0]}", log_txt_file)
+    
+    run_evaluation(methods, tasks, datasets, cluster_folder, training_epochs,step,  parallel_rollouts, log_txt_file)
+
+      
+    methods = ["mrl", "bc"]
+    #methods = ["mrl", "bc", ]
+    tasks = ["can"]
+    datasets = ["fullrandom"]
+    
+    # logging.info("Starting evaluation of the trained models")
+    print_message(f"Starting evaluation DATASET: {datasets[0]}", log_txt_file)
+    
+    run_evaluation(methods, tasks, datasets, cluster_folder, training_epochs,step,  parallel_rollouts, log_txt_file)
+    
+
     methods = ["mrl", "bc", "cql", "crl", "qrl", "bcq", "iql"]
     #methods = ["mrl", "bc"]
     tasks = ["can", "lift"]

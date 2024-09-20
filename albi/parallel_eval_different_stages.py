@@ -79,59 +79,64 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 def rollout_worker(args, checkpoint, rollout_horizon, rollout_id):
     """Worker function to run a single rollout, using CPU only."""
-    try:
-        # Set the device to CPU explicitly
-        device = torch.device("cpu")
+    # try:
+    # Set the device to CPU explicitly
+    device = torch.device("cpu")
+    
+    np.random.seed(rollout_id)
+    torch.manual_seed(rollout_id)
+    
+    print(f"Seed for rollout {rollout_id}: {rollout_id}")
 
-        # Load policy and environment inside the worker process to avoid pickling issues
-        policy, ckpt_dict = FileUtils.policy_from_checkpoint(ckpt_path=checkpoint, device=device, verbose=False)
-        
-        # read rollout settings
-        rollout_num_episodes = args.n_rollouts
-        rollout_horizon = args.horizon
-        if rollout_horizon is None:
-            # read horizon from config
-            config, _ = FileUtils.config_from_checkpoint(ckpt_dict=ckpt_dict)
-            rollout_horizon = config.experiment.rollout.horizon
+    # Load policy and environment inside the worker process to avoid pickling issues
+    policy, ckpt_dict = FileUtils.policy_from_checkpoint(ckpt_path=checkpoint, device=device, verbose=False)
+    
+    # read rollout settings
+    rollout_num_episodes = args.n_rollouts
+    rollout_horizon = args.horizon
+    if rollout_horizon is None:
+        # read horizon from config
+        config, _ = FileUtils.config_from_checkpoint(ckpt_dict=ckpt_dict)
+        rollout_horizon = config.experiment.rollout.horizon
 
-        # create environment from saved checkpoint
-        env, _ = FileUtils.env_from_checkpoint(
-            ckpt_dict=ckpt_dict, 
-            env_name=args.env, 
-            render=args.render, 
-            render_offscreen=(args.video_path is not None), 
-            verbose=False,
-        )
+    # create environment from saved checkpoint
+    env, _ = FileUtils.env_from_checkpoint(
+        ckpt_dict=ckpt_dict, 
+        env_name=args.env, 
+        render=args.render, 
+        render_offscreen=(args.video_path is not None), 
+        verbose=False,
+    )
 
-        video_writer = None
+    video_writer = None
 
-        print(f"Starting rollout {rollout_id} on CPU (Process: {os.getpid()})")
-        
-        # Perform the rollout
-        stats, traj = rollout(
-            policy=policy, 
-            env=env, 
-            horizon=rollout_horizon, 
-            use_goals=config.use_goals,
-            render=args.render, 
-            video_writer=video_writer, 
-            video_skip=args.video_skip, 
-            return_obs=False,
-            camera_names=args.camera_names,
-        )
-        
-        print(f"Finished rollout {rollout_id} on CPU (Process: {os.getpid()})")
-        return stats
+    print(f"Starting rollout {rollout_id} on CPU (Process: {os.getpid()})")
+    
+    # Perform the rollout
+    stats, traj = rollout(
+        policy=policy, 
+        env=env, 
+        horizon=rollout_horizon, 
+        use_goals=config.use_goals,
+        render=args.render, 
+        video_writer=video_writer, 
+        video_skip=args.video_skip, 
+        return_obs=False,
+        camera_names=args.camera_names,
+    )
+    
+    print(f"Finished rollout {rollout_id} on CPU (Process: {os.getpid()})")
+    return stats
 
-    except Exception as e:
-        # create a txt file to log the errors with naming the time and algo name
-        algo_name = policy.policy.global_config.experiment.name
-        txt_file = f"{policy.policy.global_config.train.output_dir}/error_logs_{algo_name}.txt"
-        with open(txt_file, 'a') as f:
-            f.write(f"Error in rollout {rollout_id}: {e}\n  ")
+    # except Exception as e:
+    #     # create a txt file to log the errors with naming the time and algo name
+    #     algo_name = policy.policy.global_config.experiment.name
+    #     txt_file = f"{policy.policy.global_config.train.output_dir}/error_logs_{algo_name}.txt"
+    #     with open(txt_file, 'a') as f:
+    #         f.write(f"Error in rollout {rollout_id}: {e}\n  ")
             
-        print(f"Error in rollout {rollout_id}: {e}")
-        return None
+    #     print(f"Error in rollout {rollout_id}: {e}")
+    #     return None
 
 
 def run_trained_agent(args, max_parallel_rollouts=4, trained_epochs=2000, step=50):
