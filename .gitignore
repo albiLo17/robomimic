@@ -11,6 +11,9 @@ dist/
 /output_GC/
 /cluster_output_GC/
 
+/robomimic_image/
+
+*.sif
 /slurm*
 
 # local test dataset that is lazily downloaded by example scripts
