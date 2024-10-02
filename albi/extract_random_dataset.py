@@ -23,11 +23,12 @@ def update_dataset(original_file_path, new_file_path, proficient_dataset_path):
                 
             # Also copy all items from the proficient file to the new file
             # Now handle merging proficient dataset items
-            for i, demo in enumerate(proficient_demos):
-                new_demo_name = f"demo_{last_demo_number + i + 1}"  # Renaming demo to start after the last demo in the original file
-                proficient_file.copy(f"data/{demo}", new_file["data"], name=new_demo_name)
-                demos.append(new_demo_name)
-                
+            if not "fullrandom" in new_file_path:
+                for i, demo in enumerate(proficient_demos):
+                    new_demo_name = f"demo_{last_demo_number + i + 1}"  # Renaming demo to start after the last demo in the original file
+                    proficient_file.copy(f"data/{demo}", new_file["data"], name=new_demo_name)
+                    demos.append(new_demo_name)
+                    
             obs_keys = list(original_file["data"][demos[0]]["obs"].keys())
                 
             # store the average of the last observations
@@ -137,6 +138,7 @@ def update_dataset(original_file_path, new_file_path, proficient_dataset_path):
 if __name__=="__main__":
     # download the dataset
     dataset_type = "random"
+    dataset_type = "fullrandom"
     hdf5_type = "low_dim_sparse"
     
     # for task in ["transport", "lift", "square", "can"]:

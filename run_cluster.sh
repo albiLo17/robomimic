@@ -4,7 +4,8 @@
 # # methods=("mrl" "bc" "cql" "crl" "qrl" "bcq" "iql")
 methods=("mrl" "bc" )
 tasks=("can")
-datasets=("random")
+# datasets=("random")
+datasets=("fullrandom")
 
 # Loop over each method
 for method in "${methods[@]}"
