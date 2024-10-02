@@ -1,13 +1,13 @@
 {
-    "algo_name": "diffuser",
+    "algo_name": "bc",
     "experiment": {
-        "name": "MetricRL_debug",
+        "name": "bc_can_random_50",
         "validate": false,
         "logging": {
             "terminal_output_to_txt": true,
             "log_tb": false,
-            "log_wandb": false,
-            "wandb_proj_name": "MetricRL"
+            "log_wandb": true,
+            "wandb_proj_name": "MetricRL_Baselines"
         },
         "save": {
             "enabled": true,
@@ -19,7 +19,7 @@
             "on_best_rollout_success_rate": true
         },
         "epoch_every_n_steps": 100,
-        "validation_epoch_every_n_steps": 1,
+        "validation_epoch_every_n_steps": 10,
         "env": null,
         "additional_envs": null,
         "render": false,
@@ -27,20 +27,20 @@
         "keep_all_videos": false,
         "video_skip": 5,
         "rollout": {
-            "enabled": true,
+            "enabled": false,
             "n": 50,
             "horizon": 400,
-            "rate": 1,
+            "rate": 50,
             "warmstart": 0,
-            "terminate_on_success": true, 
-            "goal_path": "/home/omniverse/workspace/robomimic/datasets/lift/ph/low_dim_v141_augmented_goal.hdf5"
+            "terminate_on_success": true,
+            "goal_path": "/home/omniverse/workspace/robomimic/datasets/can/random_50/low_dim_sparse_v141_augmented_goal.hdf5"
         }
     },
     "train": {
-        "data": "/home/omniverse/workspace/robomimic/datasets/lift/ph/low_dim_v141_augmented.hdf5",
-        "output_dir": "../output/mrl_trained_models_ds",
+        "data": "/home/omniverse/workspace/robomimic/datasets/can/random_50/low_dim_sparse_v141_augmented.hdf5",
+        "output_dir": "../output/bc_trained_models_ds",
         "num_data_workers": 0,
-        "hdf5_cache_mode":"all",       
+        "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,
         "hdf5_load_next_obs": true,
         "hdf5_normalize_obs": false,
@@ -61,75 +61,6 @@
         "num_epochs": 2000,
         "seed": 1
     },
-    "algo": {
-        "phi_dim":64,
-        "pre_train":false,
-        "pre_train_epochs":500,
-        "optim_params": {
-            "critic": {
-                "learning_rate": {
-                    "initial": 0.001,
-                    "decay_factor": 0.0,
-                    "epoch_schedule": []
-                },
-                "regularization": {
-                    "L2": 0.0
-                }
-            },
-            "actor": {
-                "learning_rate": {
-                    "initial": 0.0003,
-                    "decay_factor": 0.0,
-                    "epoch_schedule": []
-                },
-                "regularization": {
-                    "L2": 0.0
-                }
-            }
-        },
-        "discount": 0.99,
-        "target_tau": 0.005,
-        "actor": {
-            "net": {
-                "type": "gaussian",
-                "common": {
-                    "std_activation": "softplus",
-                    "low_noise_eval": true,
-                    "use_tanh": false
-                },
-                "gaussian": {
-                    "init_last_fc_weight": 0.001,
-                    "init_std": 0.3,
-                    "fixed_std": false
-                },
-                "gmm": {
-                    "num_modes": 5,
-                    "min_std": 0.0001
-                }
-            },
-            "layer_dims": [
-                300,
-                400
-            ],
-            "max_gradient_norm": null
-        },
-        "critic": {
-            "ensemble": {
-                "n": 1
-            },
-            "layer_dims": [
-                300,
-                400
-            ],
-            "use_huber": false,
-            "max_gradient_norm": null
-        },
-        "adv": {
-            "clip_adv_value": null,
-            "beta": 1.0,
-            "use_final_clip": true
-        }
-    },
     "observation": {
         "modalities": {
             "obs": {
@@ -144,7 +75,7 @@
                 "scan": []
             },
             "goal": {
-                "low_dim": [               ],
+                "low_dim": [],
                 "rgb": [],
                 "depth": [],
                 "scan": []

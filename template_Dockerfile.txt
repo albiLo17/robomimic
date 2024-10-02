@@ -1,0 +1,152 @@
+# Use NVIDIA's CUDA image as base
+FROM nvidia/cuda:12.1.0-devel-ubuntu22.04
+
+# Install dependencies including Python 3.8 and other necessary libraries
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y \
+    curl \
+    git \
+    software-properties-common \
+    libxrender1 \
+    libxxf86vm-dev \
+    libxfixes-dev \
+    libxi-dev \
+    libxkbcommon-dev \
+    libsm-dev \
+    libgl-dev \
+    python3-tk \
+    libglib2.0-0 \
+    libsm6 \
+    libxrender1 \
+    libxext6 \
+    wget \
+    build-essential
+
+
+
+# Add repository for Python 3.8 and install Python 3.8
+RUN add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get update && \
+    apt-get install -y python3.8 python3.8-distutils python3.8-dev
+
+# Install pip for Python 3.8
+RUN wget https://bootstrap.pypa.io/get-pip.py && \
+    python3.8 get-pip.py && \
+    rm get-pip.py
+
+# Set python3.8 as the default python
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1 && \
+    update-alternatives --config python3
+
+# Install pip and necessary Python packages
+RUN python3.8 -m pip install --upgrade pip && \
+    pip install torch torchvision torchaudio \
+    matplotlib \
+    argparse \
+    plyfile \
+    imageio-ffmpeg \
+    h5py \
+    imageio \
+    natsort \
+    numpy \
+    wandb \
+    seaborn \
+
+# Install Miniconda
+RUN curl -o ~/miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
+    bash ~/miniconda.sh -b -p /opt/conda && \
+    rm ~/miniconda.sh
+
+# Add Conda to the system path
+ENV PATH="/opt/conda/bin:$PATH"
+
+RUN ln -sf /usr/bin/python3.8 /usr/bin/python
+
+RUN apt-get update && apt-get install -y \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev
+
+RUN apt-get update && apt-get install -y \
+    libglvnd-dev \
+    libglew-dev \
+    libgl1-mesa-glx \
+    libosmesa6 \
+    libgl1-mesa-dev \
+    mesa-utils \
+    xvfb
+
+# Install additional system libraries required for egl_probe
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libegl1-mesa \
+    libgles2-mesa \
+    libglfw3 \
+    libxrandr2 \
+    libxinerama1 \
+    libxcursor1 \
+    libxi6 \
+    mesa-utils \
+    freeglut3-dev
+
+# Install Python build tools and system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    python3-dev \
+    cmake \
+    libffi-dev \
+    libssl-dev \
+    libglu1-mesa-dev \
+    libglew-dev
+
+# Clone egl_probe repository and install from source
+RUN pip install egl_probe
+
+# Clone robomimic from source and install in editable mode
+RUN cd  /home/workspace && \
+    git clone https://github.com/albiLo17/robomimic.git && \
+    cd robomimic && \
+    pip install -e .
+
+# Install robosuite from source
+RUN cd /home/workspace && \
+    git clone https://github.com/ARISE-Initiative/robosuite.git && \
+    cd robosuite && \
+    pip install -r requirements.txt
+
+# Optionally switch to v1.4.1 branch for robosuite
+RUN cd /home/workspace/robosuite && \
+    git checkout v1.4.1
+
+# Install cudnn
+RUN conda install -y -c conda-forge cudnn==8.1.0.77
+
+RUN pip install termcolor  \
+    h5py \
+    imageio \
+    imageio-ffmpeg \
+    matplotlib \
+    psutil \
+    tensorboard \
+    tensorboardX \
+    opencv-python \
+    mujoco
+
+
+# Ensure that CUDA is visible inside the container
+ENV NVIDIA_VISIBLE_DEVICES all
+ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
+
+# install this somewhere
+RUN cd /home/workspace && \
+    git clone https://github.com/quasimetric-learning/torch-quasimetric.git && \
+    cd torch-quasimetric && \
+    python setup.py install 
+
+# Set environment variable for OSMesa rendering in MuJoCo
+ENV MUJOCO_GL=osmesa
+
+ENV PYTHONPATH="/home/workspace:/home/workspace/robosuite:/home/workspace/robomimic:${PYTHONPATH}"
+# Set the default Python interpreter to Python 3.8
+CMD ["python3.8"]
