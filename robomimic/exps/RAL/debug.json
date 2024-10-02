@@ -1,5 +1,5 @@
 {
-    "algo_name": "qrl",
+    "algo_name": "diffuser",
     "experiment": {
         "name": "MetricRL_debug",
         "validate": false,

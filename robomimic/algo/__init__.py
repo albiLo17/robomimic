@@ -12,3 +12,4 @@ from robomimic.algo.td3_bc import TD3_BC
 from robomimic.algo.mrl import MetricRL
 from robomimic.algo.crl import ContrastiveRL
 from robomimic.algo.qrl import QuasimetricRL
+from robomimic.algo.diffuser import Diffuser

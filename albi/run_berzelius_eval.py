@@ -127,8 +127,8 @@ def main(dataset, task=None, training_epochs=1000, step=50, parallel_rollouts=15
 if __name__=="__main__":
     # Argument parser to handle command-line inputs
     parser = argparse.ArgumentParser(description="Run evaluation with specified dataset and task.")
-    parser.add_argument('--dataset', type=str, required=True, help="Specify the dataset.")
-    parser.add_argument('--task', type=str, default=None, help="Specify the task. Default is None.")
+    parser.add_argument('--dataset', type=str, default="mh", help="Specify the dataset.")
+    parser.add_argument('--task', type=str, default="transport", help="Specify the task. Default is None.")
 
     args = parser.parse_args()
     

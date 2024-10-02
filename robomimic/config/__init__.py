@@ -13,3 +13,4 @@ from robomimic.config.td3_bc_config import TD3_BCConfig
 from robomimic.config.mrl_config import MetricRLConfig
 from robomimic.config.crl_config import ContrastiveRLConfig
 from robomimic.config.qrl_config import QuasimetricRLConfig
+from robomimic.config.diffuser_config import DiffuserConfig
