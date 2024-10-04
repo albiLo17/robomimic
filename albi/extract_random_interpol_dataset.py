@@ -145,19 +145,22 @@ if __name__ == "__main__":
     
         
     random_data_percentage = 10  # Set this to control the percentage of random data
-    dataset_type = f"random"
-    hdf5_type = "low_dim_sparse"
     
-    if not os.path.exists(os.path.join("./datasets", "can", f"{dataset_type}_{random_data_percentage}")):
-        os.makedirs(os.path.join("./datasets", "can", f"{dataset_type}_{random_data_percentage}"), exist_ok=True)
-        # copy the dataset in random folder in this folder
-        os.system(f"cp ./datasets/can/{dataset_type}/{hdf5_type}_v141.hdf5 ./datasets/can/{dataset_type}_{random_data_percentage}/{hdf5_type}_v141.hdf5")
+    for random_data_percentage in [10, 20, 50, 70]:
+        # dataset_type = f"random"
+        dataset_type = f"random_brown"
+        hdf5_type = "low_dim_sparse"
         
-    
-    # for task in ["transport", "lift", "square", "can"]:
-    for task in ["can"]:
-        dataset_path = os.path.join("./datasets", task, f"{dataset_type}_{random_data_percentage}", f"{hdf5_type}_v141.hdf5")
-        proficient_dataset_path = os.path.join("./datasets", task, "ph", f"low_dim_v141.hdf5")
-        new_dataset_path = os.path.join("./datasets", task, f"{dataset_type}_{random_data_percentage}", f"{hdf5_type}_v141_augmented.hdf5")
+        if not os.path.exists(os.path.join("./datasets", "can", f"{dataset_type}_{random_data_percentage}")):
+            os.makedirs(os.path.join("./datasets", "can", f"{dataset_type}_{random_data_percentage}"), exist_ok=True)
+            # copy the dataset in random folder in this folder
+            os.system(f"cp ./datasets/can/{dataset_type}/{hdf5_type}_v141.hdf5 ./datasets/can/{dataset_type}_{random_data_percentage}/{hdf5_type}_v141.hdf5")
+            
         
-        update_dataset(dataset_path, new_dataset_path, proficient_dataset_path, random_data_percentage)
+        # for task in ["transport", "lift", "square", "can"]:
+        for task in ["can"]:
+            dataset_path = os.path.join("./datasets", task, f"{dataset_type}_{random_data_percentage}", f"{hdf5_type}_v141.hdf5")
+            proficient_dataset_path = os.path.join("./datasets", task, "ph", f"low_dim_v141.hdf5")
+            new_dataset_path = os.path.join("./datasets", task, f"{dataset_type}_{random_data_percentage}", f"{hdf5_type}_v141_augmented.hdf5")
+            
+            update_dataset(dataset_path, new_dataset_path, proficient_dataset_path, random_data_percentage)

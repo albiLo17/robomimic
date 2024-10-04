@@ -7,4 +7,4 @@
 source "/Midgard/home/longhini/miniconda3/etc/profile.d/conda.sh"
 conda activate robomimi
 
-y | python3 /Midgard/home/longhini/robomimic/robomimic/scripts/train_cluster.py --config "$CONFIG_FILE"
+yes | python3 /Midgard/home/longhini/robomimic/robomimic/scripts/train_cluster.py --config "$CONFIG_FILE"

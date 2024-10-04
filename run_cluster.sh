@@ -2,10 +2,13 @@
 
 # Define the tasks and datasets
 # # methods=("mrl" "bc" "cql" "crl" "qrl" "bcq" "iql")
-methods=("mrl" "bc" )
+methods=("cql" "crl" "qrl" "bcq" "iql")
+methods=("bc")
 tasks=("can")
 # datasets=("random")
-datasets=("fullrandom")
+# datasets=("fullrandom")
+# datasets=("random_10" "random_20" "random_50" "random_70")
+datasets=("random_brown_10" "random_brown_20" "random_brown_50" "random_brown_70")
 
 # Loop over each method
 for method in "${methods[@]}"
