@@ -1,5 +1,5 @@
 {
-    "algo_name": "diffuser",
+    "algo_name": "mrl",
     "experiment": {
         "name": "MetricRL_debug",
         "validate": false,
@@ -33,11 +33,11 @@
             "rate": 1,
             "warmstart": 0,
             "terminate_on_success": true, 
-            "goal_path": "/home/omniverse/workspace/robomimic/datasets/lift/ph/low_dim_v141_augmented_goal.hdf5"
+            "goal_path": "/home/omniverse/workspace/robomimic/datasets/can/random_10/low_dim_sparse_v141_augmented_goal.hdf5"
         }
     },
     "train": {
-        "data": "/home/omniverse/workspace/robomimic/datasets/lift/ph/low_dim_v141_augmented.hdf5",
+        "data": "/home/omniverse/workspace/robomimic/datasets/can/random_10/low_dim_sparse_v141_augmented.hdf5",
         "output_dir": "../output/mrl_trained_models_ds",
         "num_data_workers": 0,
         "hdf5_cache_mode":"all",       

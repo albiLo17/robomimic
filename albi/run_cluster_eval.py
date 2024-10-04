@@ -100,57 +100,61 @@ if __name__=="__main__":
     # create output text file based on the day and time
     log_txt_file = os.path.join(cluster_folder, f"evaluation_results_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt")  
       
-    methods = ["mrl", "bc"]
+    methods = ["mrl", "bc", "cql", "crl", "qrl", "bcq", "iql"]
     #methods = ["mrl", "bc", ]
     tasks = ["can"]
     datasets = ["random"]
     
-    # logging.info("Starting evaluation of the trained models")
-    print_message(f"Starting evaluation DATASET: {datasets[0]}", log_txt_file)
+    all_datasets = [["random_10"], ["random_20"], ["random_50"], ["random_70"]]
+    # all_datasets = [["random_brown_10"], ["random_brown_20"], ["random_brown_50"], ["random_brown_70"]]
     
-    run_evaluation(methods, tasks, datasets, cluster_folder, training_epochs,step,  parallel_rollouts, log_txt_file)
+    for datasets in all_datasets:
+        # logging.info("Starting evaluation of the trained models")
+        print_message(f"Starting evaluation DATASET: {datasets[0]}", log_txt_file)
+        
+        run_evaluation(methods, tasks, datasets, cluster_folder, training_epochs,step,  parallel_rollouts, log_txt_file)
 
       
-    methods = ["mrl", "bc"]
-    #methods = ["mrl", "bc", ]
-    tasks = ["can"]
-    datasets = ["fullrandom"]
+    # methods = ["mrl", "bc"]
+    # #methods = ["mrl", "bc", ]
+    # tasks = ["can"]
+    # datasets = ["fullrandom"]
     
-    # logging.info("Starting evaluation of the trained models")
-    print_message(f"Starting evaluation DATASET: {datasets[0]}", log_txt_file)
+    # # logging.info("Starting evaluation of the trained models")
+    # print_message(f"Starting evaluation DATASET: {datasets[0]}", log_txt_file)
     
-    run_evaluation(methods, tasks, datasets, cluster_folder, training_epochs,step,  parallel_rollouts, log_txt_file)
+    # run_evaluation(methods, tasks, datasets, cluster_folder, training_epochs,step,  parallel_rollouts, log_txt_file)
     
 
-    methods = ["mrl", "bc", "cql", "crl", "qrl", "bcq", "iql"]
-    #methods = ["mrl", "bc"]
-    tasks = ["can", "lift"]
-    datasets = ["mg"]
+    # methods = ["mrl", "bc", "cql", "crl", "qrl", "bcq", "iql"]
+    # #methods = ["mrl", "bc"]
+    # tasks = ["can", "lift"]
+    # datasets = ["mg"]
     
-    # logging.info("Starting evaluation of the trained models")
-    print_message(f"Starting evaluation DATASET: {datasets[0]}", log_txt_file)
+    # # logging.info("Starting evaluation of the trained models")
+    # print_message(f"Starting evaluation DATASET: {datasets[0]}", log_txt_file)
     
-    run_evaluation(methods, tasks, datasets, cluster_folder, training_epochs, step, parallel_rollouts, log_txt_file)
+    # run_evaluation(methods, tasks, datasets, cluster_folder, training_epochs, step, parallel_rollouts, log_txt_file)
     
-    methods = ["mrl", "bc", "cql", "crl", "qrl", "bcq", "iql"]
-    #methods = ["mrl", "bc", ]
-    tasks = ["can", "lift", "square", "transport"]
-    datasets = ["ph"]
+    # methods = ["mrl", "bc", "cql", "crl", "qrl", "bcq", "iql"]
+    # #methods = ["mrl", "bc", ]
+    # tasks = ["can", "lift", "square", "transport"]
+    # datasets = ["ph"]
     
-    # logging.info("Starting evaluation of the trained models")
-    print_message(f"Starting evaluation DATASET: {datasets[0]}", log_txt_file)
+    # # logging.info("Starting evaluation of the trained models")
+    # print_message(f"Starting evaluation DATASET: {datasets[0]}", log_txt_file)
     
-    run_evaluation(methods, tasks, datasets, cluster_folder, training_epochs, step, parallel_rollouts, log_txt_file)
+    # run_evaluation(methods, tasks, datasets, cluster_folder, training_epochs, step, parallel_rollouts, log_txt_file)
         
 
-    methods = ["mrl", "bc", "cql", "crl", "qrl", "bcq", "iql"]
-    #methods = ["mrl", "bc", ]
-    tasks = ["can", "lift", "square", "transport"]
-    datasets = ["mh"]
+    # methods = ["mrl", "bc", "cql", "crl", "qrl", "bcq", "iql"]
+    # #methods = ["mrl", "bc", ]
+    # tasks = ["can", "lift", "square", "transport"]
+    # datasets = ["mh"]
     
-    # logging.info("Starting evaluation of the trained models")
-    print_message(f"Starting evaluation DATASET: {datasets[0]}", log_txt_file)
+    # # logging.info("Starting evaluation of the trained models")
+    # print_message(f"Starting evaluation DATASET: {datasets[0]}", log_txt_file)
     
-    run_evaluation(methods, tasks, datasets, cluster_folder, training_epochs, step, parallel_rollouts, log_txt_file)
+    # run_evaluation(methods, tasks, datasets, cluster_folder, training_epochs, step, parallel_rollouts, log_txt_file)
         
                 

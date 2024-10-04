@@ -2,7 +2,7 @@ import os
 import h5py
 import numpy as np
 
-def update_dataset(original_file_path, new_file_path, proficient_dataset_path, random_data_percentage):
+def update_dataset(original_file_path, new_file_path, proficient_dataset_path, random_data_percentage, goal_anchor=False):
     # Open the original and proficient datasets
     with h5py.File(original_file_path, 'r') as original_file, h5py.File(proficient_dataset_path, 'r') as proficient_file:
         random_demos = list(original_file["data"].keys())
@@ -49,7 +49,10 @@ def update_dataset(original_file_path, new_file_path, proficient_dataset_path, r
                 # add key demo to all obs
                 all_obs_goal[ep] = {}
                 for k in  obs_keys:
-                    all_obs_goal[ep][k] = new_file["data"][ep]["obs"][k][-1]
+                    if goal_anchor:
+                        all_obs_goal[ep][k] = np.zeros_like(new_file["data"][ep]["obs"][k][-1])
+                    else:
+                        all_obs_goal[ep][k] = new_file["data"][ep]["obs"][k][-1]
                 # first check that the last done is 1 that in our case means that the episode is successful
                 if new_file["data"][ep]["dones"][-1] == 1:
                     num_demos_used += 1
@@ -62,6 +65,7 @@ def update_dataset(original_file_path, new_file_path, proficient_dataset_path, r
             # compute the average
             obs_avg = {k: obs_sum[k]/num_demos_used for k in obs_keys}
             obs_last = {k: obs_goal[k] for k in obs_keys}
+            obs_anchor = {k: np.zeros_like(obs_goal[k]) for k in obs_keys}
             
             print(f"Average of the last observations computed over {num_demos_used}/{len(proficient_demos)} successful episodes")
 
@@ -137,7 +141,10 @@ def update_dataset(original_file_path, new_file_path, proficient_dataset_path, r
             del original_file["goal_obs"]
         original_file.create_group("goal_obs")
         for k in obs_keys:
-            original_file["goal_obs"].create_dataset(k, data=obs_last[k])
+            if goal_anchor:
+                original_file["goal_obs"].create_dataset(k, data=obs_anchor[k])
+            else:
+                original_file["goal_obs"].create_dataset(k, data=obs_last[k])
             
     
 if __name__ == "__main__":
@@ -147,8 +154,8 @@ if __name__ == "__main__":
     random_data_percentage = 10  # Set this to control the percentage of random data
     
     for random_data_percentage in [10, 20, 50, 70]:
-        # dataset_type = f"random"
-        dataset_type = f"random_brown"
+        dataset_type = f"random"
+        # dataset_type = f"random_brown"
         hdf5_type = "low_dim_sparse"
         
         if not os.path.exists(os.path.join("./datasets", "can", f"{dataset_type}_{random_data_percentage}")):
@@ -163,4 +170,4 @@ if __name__ == "__main__":
             proficient_dataset_path = os.path.join("./datasets", task, "ph", f"low_dim_v141.hdf5")
             new_dataset_path = os.path.join("./datasets", task, f"{dataset_type}_{random_data_percentage}", f"{hdf5_type}_v141_augmented.hdf5")
             
-            update_dataset(dataset_path, new_dataset_path, proficient_dataset_path, random_data_percentage)
+            update_dataset(dataset_path, new_dataset_path, proficient_dataset_path, random_data_percentage, goal_anchor=True)

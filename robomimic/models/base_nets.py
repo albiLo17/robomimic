@@ -16,6 +16,7 @@ from torchvision import transforms
 from torchvision import models as vision_models
 
 import robomimic.utils.tensor_utils as TensorUtils
+import robomimic.utils.obs_utils as ObsUtils
 
 
 CONV_ACTIVATIONS = {
@@ -1114,3 +1115,198 @@ class FeatureAggregator(Module):
             # weighted mean-pooling
             return torch.sum(x * self.agg_weight, dim=1)
         raise Exception("unexpected agg type: {}".forward(self.agg_type))
+
+
+
+"""
+================================================
+Observation Randomizer Networks
+================================================
+"""
+class Randomizer(Module):
+    """
+    Base class for randomizer networks. Each randomizer should implement the @output_shape_in,
+    @output_shape_out, @forward_in, and @forward_out methods. The randomizer's @forward_in
+    method is invoked on raw inputs, and @forward_out is invoked on processed inputs
+    (usually processed by a @VisualCore instance). Note that the self.training property
+    can be used to change the randomizer's behavior at train vs. test time.
+    """
+    def __init__(self):
+        super(Randomizer, self).__init__()
+
+    def __init_subclass__(cls, **kwargs):
+        """
+        Hook method to automatically register all valid subclasses so we can keep track of valid observation randomizers
+        in a global dict.
+
+        This global dict stores mapping from observation randomizer network name to class.
+        We keep track of these registries to enable automated class inference at runtime, allowing
+        users to simply extend our base randomizer class and refer to that class in string form
+        in their config, without having to manually register their class internally.
+        This also future-proofs us for any additional randomizer classes we would
+        like to add ourselves.
+        """
+        ObsUtils.register_randomizer(cls)
+
+    def output_shape(self, input_shape=None):
+        """
+        This function is unused. See @output_shape_in and @output_shape_out.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def output_shape_in(self, input_shape=None):
+        """
+        Function to compute output shape from inputs to this module. Corresponds to
+        the @forward_in operation, where raw inputs (usually observation modalities)
+        are passed in.
+
+        Args:
+            input_shape (iterable of int): shape of input. Does not include batch dimension.
+                Some modules may not need this argument, if their output does not depend 
+                on the size of the input, or if they assume fixed size input.
+
+        Returns:
+            out_shape ([int]): list of integers corresponding to output shape
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def output_shape_out(self, input_shape=None):
+        """
+        Function to compute output shape from inputs to this module. Corresponds to
+        the @forward_out operation, where processed inputs (usually encoded observation
+        modalities) are passed in.
+
+        Args:
+            input_shape (iterable of int): shape of input. Does not include batch dimension.
+                Some modules may not need this argument, if their output does not depend 
+                on the size of the input, or if they assume fixed size input.
+
+        Returns:
+            out_shape ([int]): list of integers corresponding to output shape
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def forward_in(self, inputs):
+        """
+        Randomize raw inputs.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def forward_out(self, inputs):
+        """
+        Processing for network outputs.
+        """
+        return inputs
+
+
+class CropRandomizer(Randomizer):
+    """
+    Randomly sample crops at input, and then average across crop features at output.
+    """
+    def __init__(
+        self,
+        input_shape,
+        crop_height, 
+        crop_width, 
+        num_crops=1,
+        pos_enc=False,
+    ):
+        """
+        Args:
+            input_shape (tuple, list): shape of input (not including batch dimension)
+            crop_height (int): crop height
+            crop_width (int): crop width
+            num_crops (int): number of random crops to take
+            pos_enc (bool): if True, add 2 channels to the output to encode the spatial
+                location of the cropped pixels in the source image
+        """
+        super(CropRandomizer, self).__init__()
+
+        assert len(input_shape) == 3 # (C, H, W)
+        assert crop_height < input_shape[1]
+        assert crop_width < input_shape[2]
+
+        self.input_shape = input_shape
+        self.crop_height = crop_height
+        self.crop_width = crop_width
+        self.num_crops = num_crops
+        self.pos_enc = pos_enc
+
+    def output_shape_in(self, input_shape=None):
+        """
+        Function to compute output shape from inputs to this module. Corresponds to
+        the @forward_in operation, where raw inputs (usually observation modalities)
+        are passed in.
+
+        Args:
+            input_shape (iterable of int): shape of input. Does not include batch dimension.
+                Some modules may not need this argument, if their output does not depend 
+                on the size of the input, or if they assume fixed size input.
+
+        Returns:
+            out_shape ([int]): list of integers corresponding to output shape
+        """
+
+        # outputs are shape (C, CH, CW), or maybe C + 2 if using position encoding, because
+        # the number of crops are reshaped into the batch dimension, increasing the batch
+        # size from B to B * N
+        out_c = self.input_shape[0] + 2 if self.pos_enc else self.input_shape[0]
+        return [out_c, self.crop_height, self.crop_width]
+
+    def output_shape_out(self, input_shape=None):
+        """
+        Function to compute output shape from inputs to this module. Corresponds to
+        the @forward_out operation, where processed inputs (usually encoded observation
+        modalities) are passed in.
+
+        Args:
+            input_shape (iterable of int): shape of input. Does not include batch dimension.
+                Some modules may not need this argument, if their output does not depend 
+                on the size of the input, or if they assume fixed size input.
+
+        Returns:
+            out_shape ([int]): list of integers corresponding to output shape
+        """
+        
+        # since the forward_out operation splits [B * N, ...] -> [B, N, ...]
+        # and then pools to result in [B, ...], only the batch dimension changes,
+        # and so the other dimensions retain their shape.
+        return list(input_shape)
+
+    def forward_in(self, inputs):
+        """
+        Samples N random crops for each input in the batch, and then reshapes
+        inputs to [B * N, ...].
+        """
+        assert len(inputs.shape) >= 3 # must have at least (C, H, W) dimensions
+        out, _ = ObsUtils.sample_random_image_crops(
+            images=inputs,
+            crop_height=self.crop_height, 
+            crop_width=self.crop_width, 
+            num_crops=self.num_crops,
+            pos_enc=self.pos_enc,
+        )
+        # [B, N, ...] -> [B * N, ...]
+        return TensorUtils.join_dimensions(out, 0, 1)
+
+    def forward_out(self, inputs):
+        """
+        Splits the outputs from shape [B * N, ...] -> [B, N, ...] and then average across N
+        to result in shape [B, ...] to make sure the network output is consistent with
+        what would have happened if there were no randomization.
+        """
+        batch_size = (inputs.shape[0] // self.num_crops)
+        out = TensorUtils.reshape_dimensions(inputs, begin_axis=0, end_axis=0, 
+            target_dims=(batch_size, self.num_crops))
+        return out.mean(dim=1)
+
+    def __repr__(self):
+        """Pretty print network."""
+        header = '{}'.format(str(self.__class__.__name__))
+        msg = header + "(input_shape={}, crop_size=[{}, {}], num_crops={})".format(
+            self.input_shape, self.crop_height, self.crop_width, self.num_crops)
+        return msg
